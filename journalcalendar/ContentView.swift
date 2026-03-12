@@ -1,24 +1,33 @@
 //
 //  ContentView.swift
-//  journalcalendar
+//  Calendar Journal
 //
-//  Created by Elissa Martial on 3/11/26.
+//  Created on 3/11/26.
 //
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationStack {
+            VStack {
+                Text("Calendar Journal")
+                    .font(.largeTitle)
+                    .padding()
+                
+                Text("Data models are ready!")
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+            }
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(ModelContainer.preview)
 }
