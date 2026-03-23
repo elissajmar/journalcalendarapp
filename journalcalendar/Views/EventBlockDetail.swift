@@ -8,143 +8,170 @@
 import SwiftUI
 
 struct EventBlockDetail: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(ModelData.self) var modelData
+    @Environment(\.dismiss) var dismiss
+    var blockId: UUID
     
-    private let title: String
-    private let date: Date
-    private let startTime: Date
-    private let endTime: Date
+    @State private var showDeleteAlert = false
     
-    init(title: String, date: Date, startTime: Date, endTime: Date) {
-        self.title = title
-        self.date = date
-        self.startTime = startTime
-        self.endTime = endTime
+    private var block: Block? {
+        modelData.blocks.first(where: { $0.id == blockId })
     }
-    
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Title and time
+            if let block = block {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Title and time - Fixed at top
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(title)
+                        Text(block.title)
                             .font(.largeTitle)
                             .fontWeight(.bold)
+                            .lineLimit(nil)
                         
-                        Text(timeRangeString)
+                        Text(timeRangeString(for: block))
                             .font(.title3)
                             .foregroundStyle(.secondary)
                     }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    // Journal section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("JOURNAL")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                        
-                        Text(placeholderJournalText)
-                            .font(.body)
-                            .lineSpacing(4)
-                    }
+                    Divider()
                     
-                    // Images section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("IMAGES")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                        
-                        // Placeholder image grid
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 8) {
-                            ForEach(0..<3, id: \.self) { index in
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .aspectRatio(1, contentMode: .fit)
-                                    .overlay {
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(.gray)
+                    // Scrollable content
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            // Journal section
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("JOURNAL")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.secondary)
+                                
+                                Text(block.text)
+                                    .font(.body)
+                                    .lineSpacing(4)
+                            }
+                            
+                            // Images section
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("IMAGES")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.secondary)
+                                
+                                // Placeholder image grid
+                                LazyVGrid(columns: [
+                                    GridItem(.flexible()),
+                                    GridItem(.flexible()),
+                                    GridItem(.flexible())
+                                ], spacing: 8) {
+                                    ForEach(0..<3, id: \.self) { index in
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.gray.opacity(0.3))
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .overlay {
+                                                Image(systemName: "photo")
+                                                    .font(.largeTitle)
+                                                    .foregroundStyle(.gray)
+                                            }
                                     }
+                                }
                             }
                         }
+                        .padding()
                     }
                 }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                .navigationBarTitleDisplayMode(.inline)
+                .alert("Delete Event", isPresented: $showDeleteAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        deleteBlock()
                     }
+                } message: {
+                    Text("Are you sure you want to delete this event? This action cannot be undone.")
                 }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
                         Button {
-                            // TODO: Edit action
+                            dismiss()
                         } label: {
-                            Image(systemName: "pencil")
+                            Image(systemName: "xmark")
                                 .font(.body)
+                                .foregroundStyle(.secondary)
                         }
-                        
-                        Button {
-                            // TODO: Delete action
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.body)
-                                .foregroundStyle(.red)
+                        .buttonStyle(.plain)
+                    }
+                    
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 16) {
+                            NavigationLink {
+                                EventBlockDetailEdit(blockId: blockId)
+                                    .environment(modelData)
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.body)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            Button {
+                                showDeleteAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.body)
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
+            } else {
+                Text("Block not found")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.body)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
             }
         }
     }
     
     // MARK: - Helpers
     
-    private var timeRangeString: String {
+    private func timeRangeString(for block: Block) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "ha"
+        formatter.dateFormat = "h:mma"
         
-        let start = formatter.string(from: startTime).uppercased()
-        let end = formatter.string(from: endTime).uppercased()
+        let start = formatter.string(from: block.startTime).uppercased()
+        let end = formatter.string(from: block.endTime).uppercased()
         
         return "\(start) - \(end)"
     }
     
-    private var placeholderJournalText: String {
-        """
-        Uyen and I went to brunch at this new spot downtown. The weather was perfect for sitting outside. We ordered the avocado toast and the pancakes to share.
-        
-        She told me about her new job and how excited she is to start next month. I'm so happy for her - this is exactly what she's been working towards.
-        
-        We stayed for almost two hours just catching up. It's been too long since we had time like this together. Made plans to do this more regularly.
-        """
+    private func deleteBlock() {
+        modelData.deleteBlock(id: blockId)
+        dismiss()
     }
 }
 
 #Preview {
-    let calendar = Calendar.current
-    let now = Date()
+    @Previewable @State var showSheet = true
+    let modelData = ModelData()
     
-    let startTime = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: now)!
-    let endTime = calendar.date(bySettingHour: 11, minute: 0, second: 0, of: now)!
-    
-    return EventBlockDetail(
-        title: "Brunch with Uyen",
-        date: now,
-        startTime: startTime,
-        endTime: endTime
-    )
+    return Color.clear
+        .sheet(isPresented: $showSheet) {
+            EventBlockDetail(blockId: ModelData.sampleBlock.id)
+                .environment(modelData)
+        }
+        .onAppear {
+            showSheet = true
+        }
 }
