@@ -8,78 +8,101 @@
 import SwiftUI
 
 struct EventBlock: View {
-    private let title: String
-    private let date: Date
-    private let startTime: Date
-    private let endTime: Date
+    private let block: Block
+    private let onTap: () -> Void
     
-    init(title: String, date: Date, startTime: Date, endTime: Date) {
-        self.title = title
-        self.date = date
-        self.startTime = startTime
-        self.endTime = endTime
+    init(block: Block, onTap: @escaping () -> Void = {}) {
+        self.block = block
+        self.onTap = onTap
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.medium)
-                
-                Text(timeRangeString)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            
-            Spacer()
-            
-            // Stats row (placeholder for now)
-            HStack(spacing: 16) {
-                Label("527", systemImage: "text.alignleft")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                Label("3", systemImage: "photo")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-            }
+        Button(action: onTap) {
+            content
         }
-        .padding()
-        .frame(maxWidth: .infinity, minHeight: 160)
+        .buttonStyle(.plain)
+    }
+    
+    private var content: some View {
+        GeometryReader { geometry in
+            let height = geometry.size.height
+            let showLocation = height >= 90 && block.locationName != nil
+            let showStats = height >= 110
+            
+            VStack(alignment: .leading, spacing: 0) {
+                // Top section: title, time, location
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(block.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(height < 60 ? 1 : 2)
+                        .truncationMode(.tail)
+                    
+                    if height >= 50 {
+                        Text(timeRangeString)
+                            .labelStyle()
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    
+                    if showLocation, let locationName = block.locationName {
+                        Label(locationName, systemImage: "mappin.and.ellipse")
+                            .labelStyle()
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                
+                if showStats {
+                    Spacer(minLength: 0)
+                    
+                    // Bottom section: stats
+                    HStack(spacing: 12) {
+                        if !block.journalText.isEmpty {
+                            Label("\(wordCount)", systemImage: "text.alignleft")
+                                .labelStyle()
+                                .lineLimit(1)
+                        }
+                        
+                        if block.imageCount > 0 {
+                            Label("\(block.imageCount)", systemImage: "photo")
+                                .labelStyle()
+                                .lineLimit(1)
+                        }
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
-        .padding(.trailing, 16)
+        .padding(.trailing, 4)
     }
     
     // MARK: - Helpers
     
+    private var wordCount: Int {
+        let words = block.journalText.components(separatedBy: .whitespacesAndNewlines)
+        return words.filter { !$0.isEmpty }.count
+    }
+    
     private var timeRangeString: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "ha"
+        formatter.dateFormat = "h:mma"
         
-        let start = formatter.string(from: startTime).uppercased()
-        let end = formatter.string(from: endTime).uppercased()
+        let start = formatter.string(from: block.startTime).uppercased()
+        let end = formatter.string(from: block.endTime).uppercased()
         
         return "\(start) - \(end)"
     }
 }
 
 #Preview {
-    let calendar = Calendar.current
-    let now = Date()
-    
-    let startTime = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: now)!
-    let endTime = calendar.date(bySettingHour: 11, minute: 0, second: 0, of: now)!
-    
-    return EventBlock(
-        title: "Brunch with Uyen",
-        date: now,
-        startTime: startTime,
-        endTime: endTime
-    )
-    .padding()
+    EventBlock(block: ModelData.sampleBlock)
+        .frame(height: 120)
+        .padding()
 }
