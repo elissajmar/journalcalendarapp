@@ -25,9 +25,9 @@ extension Font {
         .system(size: 15, weight: .regular)
     }
     
-    /// Label style - Small text for captions and labels
+    /// Label style - Small text for captions and labels using Geist Mono
     static var label: Font {
-        .system(size: 13, weight: .semibold)
+        .custom("GeistMono-Regular", size: 13, relativeTo: .caption)
     }
 }
 

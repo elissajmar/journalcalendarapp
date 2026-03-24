@@ -6,11 +6,14 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ImagesSubBlockEdit: View {
-    @Binding var imageNames: [String]
+    @Binding var imageData: [Data]
     @Binding var isExpanded: Bool
     var onRemove: () -> Void
+    
+    @State private var selectedItems: [PhotosPickerItem] = []
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,7 +27,7 @@ struct ImagesSubBlockEdit: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     
-                    Text("IMAGES (\(imageNames.count))")
+                    Text("IMAGES (\(imageData.count))")
                         .labelStyle()
                     
                     Spacer()
@@ -44,29 +47,55 @@ struct ImagesSubBlockEdit: View {
             
             if isExpanded {
                 VStack(alignment: .leading, spacing: 12) {
-                    if !imageNames.isEmpty {
+                    if !imageData.isEmpty {
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
                             GridItem(.flexible()),
                             GridItem(.flexible())
                         ], spacing: 8) {
-                            ForEach(imageNames, id: \.self) { _ in
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .aspectRatio(1, contentMode: .fit)
-                                    .overlay {
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(.gray)
+                            ForEach(Array(imageData.enumerated()), id: \.offset) { index, data in
+                                ZStack(alignment: .topTrailing) {
+                                    if let uiImage = UIImage(data: data) {
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(minWidth: 0, maxWidth: .infinity)
+                                            .aspectRatio(1, contentMode: .fill)
+                                            .clipped()
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.gray.opacity(0.3))
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .overlay {
+                                                Image(systemName: "exclamationmark.triangle")
+                                                    .foregroundStyle(.gray)
+                                            }
                                     }
+                                    
+                                    // Delete button per image
+                                    Button {
+                                        withAnimation {
+                                            imageData.remove(at: index)
+                                        }
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(.white)
+                                            .shadow(radius: 2)
+                                    }
+                                    .offset(x: -4, y: 4)
+                                }
                             }
                         }
                     }
                     
-                    // Upload button placeholder
-                    Button {
-                        // TODO: Implement image upload
-                    } label: {
+                    // Photo picker
+                    PhotosPicker(
+                        selection: $selectedItems,
+                        maxSelectionCount: 10,
+                        matching: .images
+                    ) {
                         HStack {
                             Image(systemName: "arrow.up.circle")
                                 .font(.body)
@@ -74,6 +103,18 @@ struct ImagesSubBlockEdit: View {
                                 .font(.body)
                         }
                         .foregroundStyle(.secondary)
+                    }
+                    .onChange(of: selectedItems) { _, newItems in
+                        Task {
+                            for item in newItems {
+                                if let data = try? await item.loadTransferable(type: Data.self),
+                                   let uiImage = UIImage(data: data),
+                                   let jpeg = uiImage.jpegData(compressionQuality: 0.8) {
+                                    imageData.append(jpeg)
+                                }
+                            }
+                            selectedItems.removeAll()
+                        }
                     }
                 }
             }
