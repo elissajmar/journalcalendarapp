@@ -19,7 +19,8 @@ struct HomeView: View {
     @State private var selectedBlockId: UUID?
     @State private var showAddBlock = false
     
-    private let hourHeight: CGFloat = 120
+    @State private var hourHeight: CGFloat = 120
+    
     private var drag: BlockDragHelper { BlockDragHelper(hourHeight: hourHeight) }
     
     var body: some View {
@@ -34,6 +35,7 @@ struct HomeView: View {
                 ScrollView {
                     CalendarGridView(
                         blocks: todaysBlocks,
+                        hourHeight: $hourHeight,
                         onBlockTapped: { block in
                             selectedBlockId = block.id
                         },
@@ -42,6 +44,7 @@ struct HomeView: View {
                         }
                     )
                 }
+                .pinchToZoom(hourHeight: $hourHeight, min: 40, max: 240)
                 .onAppear {
                     proxy.scrollTo(8, anchor: .top)
                 }
