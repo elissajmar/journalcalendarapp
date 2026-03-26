@@ -10,33 +10,41 @@ import SwiftUI
 // MARK: - Custom Fonts
 
 extension Font {
-    /// Heading style - Large, bold text for titles
-    static var heading: Font {
-        .system(size: 28, weight: .bold)
+    /// Heading 2 - Page/section headers (e.g. date in calendar header)
+    static var heading2: Font {
+        .system(size: 24, weight: .regular)
     }
     
-    /// Paragraph 1 style - Primary body text
+    /// Heading 3 - Content titles (e.g. event title in detail/edit views)
+    static var heading3: Font {
+        .system(size: 18, weight: .regular)
+    }
+    
+    /// Paragraph 1 - Primary body text (e.g. event titles in blocks, journal text)
     static var paragraph1: Font {
-        .system(size: 17, weight: .regular)
+        .system(size: 14, weight: .regular)
     }
     
-    /// Paragraph 2 style - Secondary body text
-    static var paragraph2: Font {
-        .system(size: 15, weight: .regular)
-    }
-    
-    /// Label style - Small text for captions and labels using Geist Mono
+    /// Label - Small text for captions, labels, and buttons using Geist Mono
     static var label: Font {
         .custom("GeistMono-Regular", size: 13, relativeTo: .caption)
     }
 }
 
-// MARK: - Text Style Modifiers (Optional but powerful)
+// MARK: - Text Style Modifiers
 
-struct HeadingTextStyle: ViewModifier {
+struct Heading2TextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .font(.heading)
+            .font(.heading2)
+            .foregroundStyle(.primary)
+    }
+}
+
+struct Heading3TextStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.heading3)
             .foregroundStyle(.primary)
     }
 }
@@ -50,15 +58,6 @@ struct Paragraph1TextStyle: ViewModifier {
     }
 }
 
-struct Paragraph2TextStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .font(.paragraph2)
-            .foregroundStyle(.secondary)
-            .lineSpacing(2)
-    }
-}
-
 struct LabelTextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -68,70 +67,22 @@ struct LabelTextStyle: ViewModifier {
     }
 }
 
-// MARK: - View Extensions for Easy Access
+// MARK: - View Extensions
 
 extension View {
-    func headingStyle() -> some View {
-        modifier(HeadingTextStyle())
+    func heading2Style() -> some View {
+        modifier(Heading2TextStyle())
+    }
+    
+    func heading3Style() -> some View {
+        modifier(Heading3TextStyle())
     }
     
     func paragraph1Style() -> some View {
         modifier(Paragraph1TextStyle())
     }
     
-    func paragraph2Style() -> some View {
-        modifier(Paragraph2TextStyle())
-    }
-    
     func labelStyle() -> some View {
         modifier(LabelTextStyle())
     }
 }
-
-// MARK: - Custom Font Loading (if using custom font files)
-
-/*
- If you want to use custom font files (.ttf or .otf):
- 
- 1. Add your font files to your Xcode project
- 2. Add them to Info.plist under "Fonts provided by application"
- 3. Update the font definitions above:
- 
- extension Font {
-     static var heading: Font {
-         .custom("YourFontName-Bold", size: 28)
-     }
-     
-     static var paragraph1: Font {
-         .custom("YourFontName-Regular", size: 17)
-     }
-     
-     static var paragraph2: Font {
-         .custom("YourFontName-Regular", size: 15)
-     }
-     
-     static var label: Font {
-         .custom("YourFontName-Semibold", size: 13)
-     }
- }
- 
- To use with dynamic type (recommended):
- 
- extension Font {
-     static var heading: Font {
-         .custom("YourFontName-Bold", size: 28, relativeTo: .largeTitle)
-     }
-     
-     static var paragraph1: Font {
-         .custom("YourFontName-Regular", size: 17, relativeTo: .body)
-     }
-     
-     static var paragraph2: Font {
-         .custom("YourFontName-Regular", size: 15, relativeTo: .callout)
-     }
-     
-     static var label: Font {
-         .custom("YourFontName-Semibold", size: 13, relativeTo: .caption)
-     }
- }
- */
