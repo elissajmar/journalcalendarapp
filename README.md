@@ -2,6 +2,8 @@
 
 A journaling app built with SwiftUI that combines a day calendar with rich event entries.
 
+Designs: https://www.figma.com/design/u8W6IBNzafvlCrfYhV1VVg/Calendar-Journal-App?node-id=0-1&t=a7oorJQN3UN2EhYk-1
+
 ## Features
 
 - **Day calendar view** with hourly time slots and event blocks
