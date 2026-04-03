@@ -58,9 +58,10 @@ struct SubBlockEditor: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus")
-                            .font(.body)
+                            .font(.label)
                         Text("Add sub-blocks")
-                            .font(.body)
+                            .font(.label)
+                            .textCase(.uppercase)
                     }
                     .frame(maxWidth: .infinity)
                 }

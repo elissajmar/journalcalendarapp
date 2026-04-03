@@ -10,6 +10,7 @@ import SwiftUI
 struct AddEventBlock: View {
     @Environment(\.dismiss) var dismiss
     @Environment(ModelData.self) var modelData
+    @Environment(AuthController.self) var auth
     
     var initialDate: Date
     
@@ -41,8 +42,7 @@ struct AddEventBlock: View {
                     // Title and time
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("Add title", text: $title)
-                            .font(.largeTitle)
-                            .fontWeight(.medium)
+                            .font(.heading3)
                             .foregroundStyle(title.isEmpty ? .secondary : .primary)
                             .textFieldStyle(.plain)
                         
@@ -52,8 +52,7 @@ struct AddEventBlock: View {
                                 .labelsHidden()
                             
                             Text("to")
-                                .font(.body)
-                                .foregroundStyle(.secondary)
+                                .labelStyle()
                             
                             DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
                                 .datePickerStyle(.compact)
@@ -94,11 +93,10 @@ struct AddEventBlock: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.circle")
-                                    .font(.body)
                                 Text("Create")
-                                    .font(.body)
-                                    .fontWeight(.medium)
                             }
+                            .font(.label)
+                            .textCase(.uppercase)
                         }
                         .buttonStyle(.plain)
                         .disabled(title.isEmpty)
@@ -112,19 +110,23 @@ struct AddEventBlock: View {
     // MARK: - Data Management
     
     private func createBlock() {
-        modelData.createBlock(
-            title: title,
-            startTime: startTime,
-            endTime: endTime,
-            subBlocks: subBlocks
-        )
+        guard let userId = auth.currentUserId else { return }
+        Task {
+            await modelData.createBlock(
+                title: title,
+                startTime: startTime,
+                endTime: endTime,
+                subBlocks: subBlocks,
+                userId: userId
+            )
+        }
         dismiss()
     }
 }
 
 #Preview {
     @Previewable @State var showSheet = true
-    let modelData = ModelData()
+    let modelData = ModelData.preview()
     
     return Color.clear
         .sheet(isPresented: $showSheet) {

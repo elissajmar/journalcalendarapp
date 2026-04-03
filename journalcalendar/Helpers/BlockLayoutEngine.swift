@@ -66,7 +66,7 @@ struct BlockLayoutEngine {
     func height(for block: Block) -> CGFloat {
         let duration = block.endTime.timeIntervalSince(block.startTime)
         let hours = duration / 3600
-        return CGFloat(hours) * hourHeight - 8
+        return max(CGFloat(hours) * hourHeight - 8, 16)
     }
     
     /// Y offset in points for a block based on its start time

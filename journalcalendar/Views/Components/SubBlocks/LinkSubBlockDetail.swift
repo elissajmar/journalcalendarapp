@@ -19,9 +19,9 @@ struct LinkSubBlockDetail: View {
                 Link(destination: linkURL) {
                     HStack {
                         Image(systemName: "link")
-                            .font(.body)
+                            .font(.paragraph1)
                         Text(url)
-                            .font(.body)
+                            .font(.paragraph1)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
@@ -29,7 +29,7 @@ struct LinkSubBlockDetail: View {
                 }
             } else {
                 Text(url)
-                    .font(.body)
+                    .font(.paragraph1)
                     .foregroundStyle(.secondary)
             }
         }

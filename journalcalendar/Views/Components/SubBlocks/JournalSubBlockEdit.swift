@@ -45,7 +45,7 @@ struct JournalSubBlockEdit: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
                     TextEditor(text: $text)
-                        .font(.body)
+                        .font(.paragraph1)
                         .lineSpacing(4)
                         .frame(minHeight: 200)
                         .scrollContentBackground(.hidden)
@@ -56,7 +56,7 @@ struct JournalSubBlockEdit: View {
                             Group {
                                 if text.isEmpty {
                                     Text("Say something about the moment.")
-                                        .font(.body)
+                                        .font(.paragraph1)
                                         .foregroundStyle(.secondary)
                                         .padding(.leading, 17)
                                         .padding(.top, 20)

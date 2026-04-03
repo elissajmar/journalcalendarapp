@@ -6,7 +6,9 @@
 //
 
 import Foundation
+import Supabase
 
+@MainActor
 @Observable
 class ModelData {
     var blocks: [Block] = []
@@ -16,7 +18,7 @@ class ModelData {
 
     /// Fetches all blocks for the given date from Supabase,
     /// including their sub-blocks and downloaded images.
-    func fetchBlocks(for date: Date) async {
+    func fetchBlocks(for date: Date, userId: UUID) async {
         isLoading = true
         defer { isLoading = false }
 
@@ -27,6 +29,7 @@ class ModelData {
                 .from("blocks")
                 .select("*, sub_blocks(*)")
                 .eq("date", value: dateString)
+                .eq("user_id", value: userId.uuidString.lowercased())
                 .order("start_time")
                 .execute()
                 .value
@@ -38,13 +41,34 @@ class ModelData {
 
                 var subBlocks: [SubBlock] = []
                 for subDTO in sortedSubDTOs {
-                    if subDTO.type == "images", let paths = subDTO.data.imagePaths {
-                        // Download each image from Storage
-                        var imageData: [Data] = []
-                        for path in paths {
-                            if let data = try? await ImageStorageService.download(path: path) {
-                                imageData.append(data)
+                    if subDTO.type == "images", let paths = subDTO.data.imagePaths, !paths.isEmpty {
+                        // Download images with a timeout so blocks still load if downloads stall
+                        let imageData: [Data] = await withTaskGroup(of: Data?.self, returning: [Data].self) { group in
+                            for path in paths {
+                                group.addTask {
+                                    do {
+                                        return try await withThrowingTaskGroup(of: Data.self) { inner in
+                                            inner.addTask {
+                                                try await ImageStorageService.download(path: path)
+                                            }
+                                            inner.addTask {
+                                                try await Task.sleep(for: .seconds(10))
+                                                throw CancellationError()
+                                            }
+                                            let result = try await inner.next()!
+                                            inner.cancelAll()
+                                            return result
+                                        }
+                                    } catch {
+                                        return nil
+                                    }
+                                }
                             }
+                            var results: [Data] = []
+                            for await data in group {
+                                if let data { results.append(data) }
+                            }
+                            return results
                         }
                         subBlocks.append(SubBlock(dto: subDTO, imageData: imageData))
                     } else {
@@ -67,14 +91,14 @@ class ModelData {
 
     /// Creates a new block in Supabase, uploads any images, and
     /// adds the block to the local array.
-    func createBlock(title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock]) async {
+    func createBlock(title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock], userId: UUID) async {
         let calendar = Calendar.current
         let date = calendar.startOfDay(for: startTime)
         let blockId = UUID()
 
         let blockDTO = BlockDTO(
             id: blockId,
-            userId: nil,
+            userId: userId,
             title: title,
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
@@ -125,13 +149,13 @@ class ModelData {
 
     /// Updates an existing block in Supabase. Replaces all sub-blocks
     /// (deletes old ones, inserts new ones).
-    func updateBlock(id: UUID, title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock]) async {
+    func updateBlock(id: UUID, title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock], userId: UUID) async {
         let calendar = Calendar.current
         let date = calendar.startOfDay(for: startTime)
 
         let blockDTO = BlockDTO(
             id: id,
-            userId: nil,
+            userId: userId,
             title: title,
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),

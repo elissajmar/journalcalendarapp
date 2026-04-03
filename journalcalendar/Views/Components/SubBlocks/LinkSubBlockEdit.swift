@@ -44,7 +44,7 @@ struct LinkSubBlockEdit: View {
             
             if isExpanded {
                 TextField("https://", text: $url)
-                    .font(.body)
+                    .font(.paragraph1)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

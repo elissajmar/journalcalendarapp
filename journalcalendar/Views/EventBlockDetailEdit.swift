@@ -10,6 +10,7 @@ import SwiftUI
 struct EventBlockDetailEdit: View {
     @Environment(\.dismiss) var dismiss
     @Environment(ModelData.self) var modelData
+    @Environment(AuthController.self) var auth
     
     var blockId: UUID
     
@@ -29,8 +30,7 @@ struct EventBlockDetailEdit: View {
                 // Title and time
                 VStack(alignment: .leading, spacing: 12) {
                     TextField("Event title", text: $title)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(.heading3)
                         .textFieldStyle(.plain)
                     
                     HStack(spacing: 12) {
@@ -39,8 +39,7 @@ struct EventBlockDetailEdit: View {
                             .labelsHidden()
                         
                         Text("to")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                            .labelStyle()
                         
                         DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
                             .datePickerStyle(.compact)
@@ -88,11 +87,10 @@ struct EventBlockDetailEdit: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.body)
                             Text("Save")
-                                .font(.body)
-                                .fontWeight(.medium)
                         }
+                        .font(.label)
+                        .textCase(.uppercase)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(Color(uiColor: .secondarySystemBackground))
@@ -118,18 +116,24 @@ struct EventBlockDetailEdit: View {
     }
     
     private func saveChanges() {
-        modelData.updateBlock(
-            id: blockId,
-            title: title,
-            startTime: startTime,
-            endTime: endTime,
-            subBlocks: subBlocks
-        )
+        guard let userId = auth.currentUserId else { return }
+        Task {
+            await modelData.updateBlock(
+                id: blockId,
+                title: title,
+                startTime: startTime,
+                endTime: endTime,
+                subBlocks: subBlocks,
+                userId: userId
+            )
+        }
         dismiss()
     }
     
     private func deleteBlock() {
-        modelData.deleteBlock(id: blockId)
+        Task {
+            await modelData.deleteBlock(id: blockId)
+        }
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             dismiss()
@@ -139,7 +143,7 @@ struct EventBlockDetailEdit: View {
 
 #Preview {
     @Previewable @State var showSheet = true
-    let modelData = ModelData()
+    let modelData = ModelData.preview()
     
     return NavigationStack {
         Color.clear

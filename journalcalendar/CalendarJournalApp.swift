@@ -15,23 +15,20 @@ struct CalendarJournalApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if authController.isCheckingSession {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .tint(.white)
-                    Text("loading")
-                        .font(.label)
-                        .foregroundStyle(.white)
+            Group {
+                if authController.session != nil {
+                    ContentView()
+                        .environment(modelData)
+                        .environment(authController)
+                } else {
+                    LoginView()
+                        .environment(authController)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(hex: "7A6559"))
-            } else if authController.session != nil {
-                ContentView()
-                    .environment(modelData)
-                    .environment(authController)
-            } else {
-                LoginView()
-                    .environment(authController)
+            }
+            .onChange(of: authController.session == nil) { _, isSignedOut in
+                if isSignedOut {
+                    modelData.blocks = []
+                }
             }
         }
     }

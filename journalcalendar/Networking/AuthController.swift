@@ -18,9 +18,6 @@ final class AuthController {
     /// The current session, or nil if signed out.
     var session: Session?
     
-    /// True while the initial session check is in progress.
-    var isCheckingSession = true
-    
     /// The authenticated user's ID, or nil if not signed in.
     var currentUserId: UUID? {
         session?.user.id
@@ -32,14 +29,14 @@ final class AuthController {
     private var authStateTask: Task<Void, Never>?
     
     init() {
+        // Read the locally cached session immediately (no network)
+        self.session = AppSupabase.client.auth.currentSession
+        
+        // Listen for auth state changes (sign-in, sign-out, token refresh)
         authStateTask = Task {
             for await (event, session) in AppSupabase.client.auth.authStateChanges {
-                if [.initialSession, .signedIn, .signedOut].contains(event) {
+                if [.initialSession, .signedIn, .signedOut, .tokenRefreshed].contains(event) {
                     self.session = session
-                    
-                    if event == .initialSession {
-                        self.isCheckingSession = false
-                    }
                 }
             }
         }

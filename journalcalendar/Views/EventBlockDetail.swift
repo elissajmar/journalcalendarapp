@@ -9,6 +9,7 @@ import SwiftUI
 
 struct EventBlockDetail: View {
     @Environment(ModelData.self) var modelData
+    @Environment(AuthController.self) var auth
     @Environment(\.dismiss) var dismiss
     var blockId: UUID
     
@@ -21,66 +22,33 @@ struct EventBlockDetail: View {
     var body: some View {
         NavigationStack {
             if let block = block {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Title and time - Fixed at top
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(block.title)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .lineLimit(nil)
-                        
-                        Text(timeRangeString(for: block))
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    Divider()
-                    
-                    // Scrollable content
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            // Journal section
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("JOURNAL")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.secondary)
-                                
-                                Text(block.text)
-                                    .font(.body)
-                                    .lineSpacing(4)
-                            }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 48) {
+                        // Title and time
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(block.title)
+                                .heading3Style()
+                                .lineLimit(nil)
                             
-                            // Images section
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("IMAGES")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.secondary)
-                                
-                                // Placeholder image grid
-                                LazyVGrid(columns: [
-                                    GridItem(.flexible()),
-                                    GridItem(.flexible()),
-                                    GridItem(.flexible())
-                                ], spacing: 8) {
-                                    ForEach(0..<3, id: \.self) { index in
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.gray.opacity(0.3))
-                                            .aspectRatio(1, contentMode: .fit)
-                                            .overlay {
-                                                Image(systemName: "photo")
-                                                    .font(.largeTitle)
-                                                    .foregroundStyle(.gray)
-                                            }
-                                    }
-                                }
+                            Text(timeRangeString(for: block))
+                                .labelStyle()
+                        }
+                        
+                        // Sub-blocks
+                        ForEach(block.subBlocks) { subBlock in
+                            switch subBlock {
+                            case .journal(_, let text):
+                                JournalSubBlockDetail(text: text)
+                            case .images(_, let imageData):
+                                ImagesSubBlockDetail(imageData: imageData)
+                            case .link(_, let url):
+                                LinkSubBlockDetail(url: url)
+                            case .location(_, let name, let latitude, let longitude):
+                                LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
                             }
                         }
-                        .padding()
                     }
+                    .padding()
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .alert("Delete Event", isPresented: $showDeleteAlert) {
@@ -108,6 +76,7 @@ struct EventBlockDetail: View {
                             NavigationLink {
                                 EventBlockDetailEdit(blockId: blockId)
                                     .environment(modelData)
+                                    .environment(auth)
                             } label: {
                                 Image(systemName: "pencil")
                                     .font(.body)
@@ -127,6 +96,8 @@ struct EventBlockDetail: View {
                 }
             } else {
                 Text("Block not found")
+                    .paragraph1Style()
+                    .foregroundStyle(.secondary)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
@@ -147,24 +118,20 @@ struct EventBlockDetail: View {
     // MARK: - Helpers
     
     private func timeRangeString(for block: Block) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mma"
-        
-        let start = formatter.string(from: block.startTime).uppercased()
-        let end = formatter.string(from: block.endTime).uppercased()
-        
-        return "\(start) - \(end)"
+        DateFormatters.timeRange(from: block.startTime, to: block.endTime)
     }
     
     private func deleteBlock() {
-        modelData.deleteBlock(id: blockId)
+        Task {
+            await modelData.deleteBlock(id: blockId)
+        }
         dismiss()
     }
 }
 
 #Preview {
     @Previewable @State var showSheet = true
-    let modelData = ModelData()
+    let modelData = ModelData.preview()
     
     return Color.clear
         .sheet(isPresented: $showSheet) {

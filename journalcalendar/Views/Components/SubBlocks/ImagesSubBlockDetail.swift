@@ -41,7 +41,7 @@ struct ImagesSubBlockDetail: View {
                 }
             } else {
                 Text("No images")
-                    .font(.body)
+                    .font(.paragraph1)
                     .foregroundStyle(.secondary)
             }
         }

@@ -6,11 +6,13 @@
 //  with your project's values from the Supabase Dashboard.
 //
 
+import Foundation
 import Supabase
 
 enum AppSupabase {
     static let client = SupabaseClient(
-        supabaseURL: URL(string: "YOUR_SUPABASE_URL")!,
-        supabaseKey: "YOUR_SUPABASE_ANON_KEY"
+        supabaseURL: URL(string: "https://wfxcwmpmixuvzcnzwgwn.supabase.co")!,
+        supabaseKey: "sb_publishable_7dN3Rs6ebjcMOun8Z7HQ0Q_zHI0P8_p",
+        options: .init(auth: .init(emitLocalSessionAsInitialSession: true))
     )
 }

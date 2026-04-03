@@ -86,7 +86,7 @@ struct LocationSubBlockEdit: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(locationName)
-                        .font(.body)
+                        .font(.paragraph1)
                         .lineLimit(2)
                 }
                 
@@ -97,8 +97,7 @@ struct LocationSubBlockEdit: View {
                     searchService.queryFragment = ""
                 } label: {
                     Text("Change")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .labelStyle()
                 }
             }
         }
@@ -109,7 +108,7 @@ struct LocationSubBlockEdit: View {
     private var searchView: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Search for a place", text: $searchService.queryFragment)
-                .font(.body)
+                .font(.paragraph1)
                 .padding(12)
                 .background(Color(uiColor: .secondarySystemBackground))
                 .cornerRadius(8)
@@ -122,12 +121,11 @@ struct LocationSubBlockEdit: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(completion.title)
-                                    .font(.body)
+                                    .font(.paragraph1)
                                     .foregroundStyle(.primary)
                                 if !completion.subtitle.isEmpty {
                                     Text(completion.subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .labelStyle()
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)

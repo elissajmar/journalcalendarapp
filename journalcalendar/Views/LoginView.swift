@@ -34,10 +34,10 @@ struct LoginView: View {
             Text(mode == .signUp ? "CREATE AN ACCOUNT" : "SIGN IN")
                 .font(.label)
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 16)
+                .padding(.bottom, 24)
             
-            // Form fields
-            VStack(spacing: 0) {
+            // Email, password, and create account button (8px gaps)
+            VStack(spacing: 8) {
                 TextField("Youraddress@gmail.com", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
@@ -60,52 +60,46 @@ struct LoginView: View {
                     .padding(.horizontal, 20)
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .padding(.horizontal, 24)
-            
-            // Error message
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.label)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
-            }
-            
-            // Email confirmation message
-            if showEmailConfirmation {
-                Text("Check your inbox for a confirmation email.")
-                    .font(.label)
-                    .foregroundStyle(.green)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
-            }
-            
-            // Primary action button
-            Button {
-                Task { await primaryAction() }
-            } label: {
-                HStack(spacing: 8) {
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text(mode == .signUp ? "Create account" : "Sign in")
+                
+                // Error message
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.label)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
                 }
-                .font(.label)
-                .textCase(.uppercase)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(Color(hex: "7A6559"))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                
+                // Email confirmation message
+                if showEmailConfirmation {
+                    Text("Check your inbox for a confirmation email.")
+                        .font(.label)
+                        .foregroundStyle(.green)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Primary action button
+                Button {
+                    Task { await primaryAction() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                        Text(mode == .signUp ? "Create account" : "Sign in")
+                    }
+                    .font(.label)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(Color(hex: "7A6559"))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(email.isEmpty || password.isEmpty || isLoading)
+                .opacity((email.isEmpty || password.isEmpty) ? 0.5 : 1.0)
             }
-            .disabled(email.isEmpty || password.isEmpty || isLoading)
-            .opacity((email.isEmpty || password.isEmpty) ? 0.5 : 1.0)
             .padding(.horizontal, 24)
-            .padding(.top, 4)
             
             // OR divider
             HStack(spacing: 12) {
@@ -120,10 +114,10 @@ struct LoginView: View {
                     .frame(height: 1)
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, 20)
+            .padding(.vertical, 24)
             
             // Social sign-in buttons (placeholders)
-            VStack(spacing: 0) {
+            VStack(spacing: 8) {
                 socialButton(icon: "g.square.fill", label: "Sign in with Google")
                 socialButton(icon: "apple.logo", label: "Sign in with Apple")
             }

@@ -16,7 +16,7 @@ struct JournalSubBlockDetail: View {
                 .labelStyle()
             
             Text(text)
-                .font(.body)
+                .font(.paragraph1)
                 .lineSpacing(4)
         }
     }

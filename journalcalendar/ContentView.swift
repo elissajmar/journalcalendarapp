@@ -9,25 +9,16 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(ModelData.self) var modelData
     
     var body: some View {
         NavigationStack {
-            VStack {
-                Text("Calendar Journal")
-                    .font(.largeTitle)
-                    .padding()
-                
-                Text("Data models are ready!")
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-            }
+            HomeView()
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(ModelContainer.preview)
+        .environment(ModelData())
 }

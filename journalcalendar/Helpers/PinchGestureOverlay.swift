@@ -18,14 +18,13 @@ struct ScrollViewPinchZoom: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .overlay {
+            .background(
                 ScrollViewPinchAttacher(
                     hourHeight: $hourHeight,
                     minHourHeight: minHourHeight,
                     maxHourHeight: maxHourHeight
                 )
-                .allowsHitTesting(false)
-            }
+            )
     }
 }
 

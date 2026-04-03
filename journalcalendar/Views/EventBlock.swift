@@ -17,10 +17,11 @@ struct EventBlock: View {
     }
     
     var body: some View {
-        Button(action: onTap) {
-            content
-        }
-        .buttonStyle(.plain)
+        content
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap()
+            }
     }
     
     private var content: some View {
@@ -33,7 +34,7 @@ struct EventBlock: View {
                 // Top section: title, time, location
                 VStack(alignment: .leading, spacing: 2) {
                     Text(block.title)
-                        .font(.subheadline)
+                        .font(.paragraph1)
                         .fontWeight(.medium)
                         .lineLimit(height < 60 ? 1 : 2)
                         .truncationMode(.tail)
@@ -91,13 +92,7 @@ struct EventBlock: View {
     }
     
     private var timeRangeString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mma"
-        
-        let start = formatter.string(from: block.startTime).uppercased()
-        let end = formatter.string(from: block.endTime).uppercased()
-        
-        return "\(start) - \(end)"
+        DateFormatters.timeRange(from: block.startTime, to: block.endTime)
     }
 }
 

@@ -34,7 +34,7 @@ struct MoreEventsPill: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
+        .background(Color("PillBackground"))
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
     }

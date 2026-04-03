@@ -95,11 +95,26 @@ extension BlockDTO {
     }()
 
     /// Formatter for timestamptz columns (ISO8601).
+    /// Used for encoding dates when inserting/updating.
     static let iso8601Formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
+    
+    /// Fallback formatter without fractional seconds.
+    /// Supabase may omit fractional seconds when they are zero.
+    private static let iso8601FallbackFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    
+    /// Parses an ISO8601 timestamp, trying with and without fractional seconds.
+    static func parseISO8601(_ string: String) -> Date? {
+        iso8601Formatter.date(from: string)
+            ?? iso8601FallbackFormatter.date(from: string)
+    }
 }
 
 // MARK: - Block ↔ DTO Conversions
@@ -120,8 +135,8 @@ extension Block {
     /// Build a Block from a joined query DTO and pre-built SubBlocks.
     init?(dto: BlockWithSubBlocksDTO, subBlocks: [SubBlock]) {
         guard let date = BlockDTO.dateFormatter.date(from: dto.date),
-              let startTime = BlockDTO.iso8601Formatter.date(from: dto.startTime),
-              let endTime = BlockDTO.iso8601Formatter.date(from: dto.endTime) else {
+              let startTime = BlockDTO.parseISO8601(dto.startTime),
+              let endTime = BlockDTO.parseISO8601(dto.endTime) else {
             return nil
         }
         self.init(

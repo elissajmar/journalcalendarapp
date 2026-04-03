@@ -14,14 +14,22 @@ extension UUID: @retroactive Identifiable {
 
 struct HomeView: View {
     @Environment(ModelData.self) var modelData
+    @Environment(AuthController.self) var auth
 
     @State private var selectedDate = Date()
     @State private var selectedBlockId: UUID?
     @State private var showAddBlock = false
     
     @State private var hourHeight: CGFloat = 120
+    @State private var scrollOffset: CGFloat = 0
+    @State private var viewportHeight: CGFloat = 0
     
     private var drag: BlockDragHelper { BlockDragHelper(hourHeight: hourHeight) }
+    
+    private var offscreenCounts: OffscreenBlockCounter.Result {
+        let counter = OffscreenBlockCounter(layout: BlockLayoutEngine(hourHeight: hourHeight))
+        return counter.count(blocks: todaysBlocks, scrollOffset: scrollOffset, viewportHeight: viewportHeight)
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -43,21 +51,53 @@ struct HomeView: View {
                             finishDrag(for: block, translation: translation)
                         }
                     )
+                    .pinchToZoom(hourHeight: $hourHeight, min: 40, max: 240)
                 }
-                .pinchToZoom(hourHeight: $hourHeight, min: 40, max: 240)
+                .onScrollGeometryChange(for: CGFloat.self) { geo in
+                    geo.contentOffset.y + geo.contentInsets.top
+                } action: { _, newValue in
+                    scrollOffset = newValue
+                }
+                .onScrollGeometryChange(for: CGFloat.self) { geo in
+                    geo.visibleRect.height
+                } action: { _, newValue in
+                    viewportHeight = newValue
+                }
                 .onAppear {
                     proxy.scrollTo(8, anchor: .top)
                 }
             }
+            .overlay(alignment: .top) {
+                if offscreenCounts.aboveCount > 0 {
+                    MoreEventsPill(count: offscreenCounts.aboveCount, direction: .up)
+                        .padding(.top, 8)
+                        .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if offscreenCounts.belowCount > 0 {
+                    MoreEventsPill(count: offscreenCounts.belowCount, direction: .down)
+                        .padding(.bottom, 8)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: offscreenCounts.aboveCount)
+            .animation(.easeInOut(duration: 0.25), value: offscreenCounts.belowCount)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color("AppBackground"))
         .sheet(item: $selectedBlockId) { blockId in
             EventBlockDetail(blockId: blockId)
                 .environment(modelData)
+                .environment(auth)
+        }
+        .task(id: selectedDate) {
+            guard let userId = auth.currentUserId else { return }
+            await modelData.fetchBlocks(for: selectedDate, userId: userId)
         }
         .sheet(isPresented: $showAddBlock) {
             AddEventBlock(initialDate: selectedDate)
                 .environment(modelData)
+                .environment(auth)
         }
     }
     
@@ -80,10 +120,18 @@ struct HomeView: View {
             
             // Date display
             Text(DateFormatters.shortDate(from: selectedDate))
-                .font(.title2)
-                .fontWeight(.medium)
+                .heading2Style()
             
             Spacer()
+            
+            // Sign out button
+            Button {
+                Task { try? await auth.signOut() }
+            } label: {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
             
             // Add Block button
             Button(action: { showAddBlock = true }) {
@@ -91,6 +139,8 @@ struct HomeView: View {
                     Image(systemName: "plus")
                     Text("Block")
                 }
+                .font(.label)
+                .textCase(.uppercase)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .background(Color.brown)
@@ -122,18 +172,22 @@ struct HomeView: View {
         guard let newTimes = drag.newTimes(for: block, translation: translation) else {
             return
         }
+        guard let userId = auth.currentUserId else { return }
         
-        modelData.updateBlock(
-            id: block.id,
-            title: block.title,
-            startTime: newTimes.start,
-            endTime: newTimes.end,
-            subBlocks: block.subBlocks
-        )
+        Task {
+            await modelData.updateBlock(
+                id: block.id,
+                title: block.title,
+                startTime: newTimes.start,
+                endTime: newTimes.end,
+                subBlocks: block.subBlocks,
+                userId: userId
+            )
+        }
     }
 }
 
 #Preview {
     HomeView()
-        .environment(ModelData())
+        .environment(ModelData.preview())
 }

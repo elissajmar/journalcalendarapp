@@ -103,9 +103,10 @@ struct ImagesSubBlockEdit: View {
                     ) {
                         HStack {
                             Image(systemName: "arrow.up.circle")
-                                .font(.body)
+                                .font(.label)
                             Text("Upload")
-                                .font(.body)
+                                .font(.label)
+                                .textCase(.uppercase)
                         }
                         .foregroundStyle(.secondary)
                     }

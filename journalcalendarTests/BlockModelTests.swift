@@ -17,19 +17,19 @@ import Foundation
 struct BlockModelTests {
     
     // MARK: - journalText
-    // Filters sub-blocks for .journal cases and joins their text
-    // with double newlines. Non-journal sub-blocks are ignored.
+    // Filters sub-blocks for .journal cases and extracts their text.
+    // The app only allows one journal sub-block per block (the add menu
+    // hides types that already exist), so the typical case is a single entry.
     
-    /// Two journal sub-blocks should be joined with "\n\n" separator.
-    @Test func journalTextJoinsMultipleEntries() {
+    /// A block with a single journal sub-block returns that text directly.
+    @Test func journalTextReturnsSingleEntry() {
         let block = makeBlock(
             startHour: 10, endHour: 11,
             subBlocks: [
-                .journal(text: "First entry"),
-                .journal(text: "Second entry")
+                .journal(text: "Had a great day at the park")
             ]
         )
-        #expect(block.journalText == "First entry\n\nSecond entry")
+        #expect(block.journalText == "Had a great day at the park")
     }
     
     /// A block with no journal sub-blocks returns an empty string.
@@ -61,21 +61,43 @@ struct BlockModelTests {
         #expect(block.journalText == "Only journal")
     }
     
+    /// An empty journal string is still returned — the UI is responsible
+    /// for deciding whether to display it based on isEmpty.
+    @Test func journalTextReturnsEmptyStringEntry() {
+        let block = makeBlock(
+            startHour: 10, endHour: 11,
+            subBlocks: [.journal(text: "")]
+        )
+        #expect(block.journalText == "")
+    }
+    
     // MARK: - locationName
     // Returns the name of the first location sub-block with a non-empty name.
-    // Empty-string locations are skipped. Returns nil if no location is found.
+    // Empty-string locations are skipped. Returns nil if no match is found.
+    // The app only allows one location sub-block per block.
     
-    /// When the first location has an empty name, it should be skipped
-    /// and the second location's name should be returned instead.
-    @Test func locationNameReturnsFirstNonEmpty() {
+    /// A location sub-block with a valid name is returned.
+    @Test func locationNameReturnsName() {
         let block = makeBlock(
             startHour: 10, endHour: 11,
             subBlocks: [
-                .location(name: "", latitude: 0, longitude: 0),
                 .location(name: "Central Park", latitude: 40.78, longitude: -73.97)
             ]
         )
         #expect(block.locationName == "Central Park")
+    }
+    
+    /// A location sub-block with an empty name is treated as "no location" —
+    /// locationName returns nil. This can happen when the user adds a location
+    /// sub-block but hasn't searched/selected a place yet.
+    @Test func locationNameNilWhenNameIsEmpty() {
+        let block = makeBlock(
+            startHour: 10, endHour: 11,
+            subBlocks: [
+                .location(name: "", latitude: 0, longitude: 0)
+            ]
+        )
+        #expect(block.locationName == nil)
     }
     
     /// A block with no location sub-blocks at all returns nil.
@@ -90,19 +112,41 @@ struct BlockModelTests {
     }
     
     // MARK: - imageCount
-    // Sums the count of image Data objects across all .images sub-blocks.
-    // A block can have multiple .images sub-blocks (e.g., added at different times).
+    // Returns the count of image Data objects in the .images sub-block.
+    // The app only allows one .images sub-block per block.
     
-    /// Two image sub-blocks with 2 and 1 images respectively → total of 3.
-    @Test func imageCountSumsAcrossMultipleSubBlocks() {
+    /// An images sub-block with 3 photos reports imageCount of 3.
+    @Test func imageCountReturnsPhotoCount() {
         let block = makeBlock(
             startHour: 10, endHour: 11,
             subBlocks: [
-                .images(imageData: [Data(), Data()]),
-                .images(imageData: [Data()])
+                .images(imageData: [Data(), Data(), Data()])
             ]
         )
         #expect(block.imageCount == 3)
+    }
+    
+    /// An images sub-block with an empty array (user added the section
+    /// but hasn't picked photos yet) reports imageCount of 0.
+    @Test func imageCountZeroWhenNoPhotosAdded() {
+        let block = makeBlock(
+            startHour: 10, endHour: 11,
+            subBlocks: [
+                .images(imageData: [])
+            ]
+        )
+        #expect(block.imageCount == 0)
+    }
+    
+    /// A block with no images sub-block at all also reports 0.
+    @Test func imageCountZeroWhenNoImagesSubBlock() {
+        let block = makeBlock(
+            startHour: 10, endHour: 11,
+            subBlocks: [
+                .journal(text: "Just text")
+            ]
+        )
+        #expect(block.imageCount == 0)
     }
     
     // MARK: - SubBlock.type
@@ -120,5 +164,34 @@ struct BlockModelTests {
         #expect(images.type == .images)
         #expect(link.type == .link)
         #expect(location.type == .location)
+    }
+    
+    /// Each SubBlock case stores its own UUID. Passing a specific ID in
+    /// should be reflected back by the .id computed property. This matters
+    /// because SubBlockEditor uses IDs to create bindings for each sub-block.
+    @Test func subBlockIdIsPreserved() {
+        let customId = UUID()
+        let journal = SubBlock.journal(id: customId, text: "test")
+        #expect(journal.id == customId)
+        
+        let images = SubBlock.images(id: customId, imageData: [])
+        #expect(images.id == customId)
+        
+        let link = SubBlock.link(id: customId, url: "https://example.com")
+        #expect(link.id == customId)
+        
+        let location = SubBlock.location(id: customId, name: "", latitude: 0, longitude: 0)
+        #expect(location.id == customId)
+    }
+    
+    // MARK: - Edge cases
+    
+    /// A block with no sub-blocks at all should return safe defaults
+    /// for all computed properties — empty text, nil location, 0 images.
+    @Test func emptySubBlocksReturnDefaults() {
+        let block = makeBlock(startHour: 10, endHour: 11, subBlocks: [])
+        #expect(block.journalText == "")
+        #expect(block.locationName == nil)
+        #expect(block.imageCount == 0)
     }
 }

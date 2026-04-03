@@ -40,9 +40,9 @@ struct LocationSubBlockDetail: View {
             } label: {
                 HStack {
                     Image(systemName: "mappin.and.ellipse")
-                        .font(.body)
+                        .font(.paragraph1)
                     Text(name)
-                        .font(.body)
+                        .font(.paragraph1)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
