@@ -6,14 +6,33 @@
 //
 
 import SwiftUI
-import SwiftData
+import Supabase
 
 @main
 struct CalendarJournalApp: App {
+    @State private var authController = AuthController()
+    @State private var modelData = ModelData()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if authController.isCheckingSession {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("loading")
+                        .font(.label)
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(hex: "7A6559"))
+            } else if authController.session != nil {
+                ContentView()
+                    .environment(modelData)
+                    .environment(authController)
+            } else {
+                LoginView()
+                    .environment(authController)
+            }
         }
-        .modelContainer(ModelContainer.shared)
     }
 }
