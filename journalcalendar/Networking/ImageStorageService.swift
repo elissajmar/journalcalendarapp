@@ -28,7 +28,7 @@ struct ImageStorageService {
 
         try await AppSupabase.client.storage
             .from("images")
-            .upload(path, data: imageData, options: .init(contentType: "image/jpeg"))
+            .upload(path, data: imageData, options: FileOptions(contentType: "image/jpeg"))
 
         return path
     }

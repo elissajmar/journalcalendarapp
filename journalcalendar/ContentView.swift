@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
     @Environment(ModelData.self) var modelData
@@ -20,5 +19,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .environment(ModelData())
+        .environment(ModelData.preview())
+        .environment(AuthController())
 }

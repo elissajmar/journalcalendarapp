@@ -16,7 +16,12 @@ struct CalendarJournalApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if authController.session != nil {
+                if !authController.isReady {
+                    // Show blank background while the auth check runs off the main thread.
+                    // This prevents startup lag and avoids a login-screen flash for
+                    // users who are already signed in.
+                    Color("AppBackground").ignoresSafeArea()
+                } else if authController.session != nil {
                     ContentView()
                         .environment(modelData)
                         .environment(authController)

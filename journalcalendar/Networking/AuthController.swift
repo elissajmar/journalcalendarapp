@@ -18,6 +18,10 @@ final class AuthController {
     /// The current session, or nil if signed out.
     var session: Session?
     
+    /// True once the initial auth state check has completed.
+    /// Used to show a loading screen instead of a login flash on launch.
+    var isReady: Bool = false
+    
     /// The authenticated user's ID, or nil if not signed in.
     var currentUserId: UUID? {
         session?.user.id
@@ -29,14 +33,19 @@ final class AuthController {
     private var authStateTask: Task<Void, Never>?
     
     init() {
-        // Read the locally cached session immediately (no network)
-        self.session = AppSupabase.client.auth.currentSession
-        
-        // Listen for auth state changes (sign-in, sign-out, token refresh)
+        // Do NOT access AppSupabase.client synchronously here.
+        // Doing so blocks the main thread with Supabase client init + keychain
+        // access before the first UI frame even renders, causing visible startup lag.
+        // Instead, defer all Supabase work into an async task so the UI appears
+        // immediately. emitLocalSessionAsInitialSession:true ensures the cached
+        // session is still delivered as the very first authStateChanges event.
         authStateTask = Task {
+            // Yield once so the initial UI frame renders before Supabase initializes.
+            await Task.yield()
             for await (event, session) in AppSupabase.client.auth.authStateChanges {
                 if [.initialSession, .signedIn, .signedOut, .tokenRefreshed].contains(event) {
                     self.session = session
+                    if !self.isReady { self.isReady = true }
                 }
             }
         }

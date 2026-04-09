@@ -41,7 +41,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		8D3868EA2F648E64009053A1 /* Exceptions for "journalcalendar" folder in "journalcalendar" target */ = {
+		8D9B03EA2F84A4440026D6A8 /* Exceptions for "journalcalendar" folder in "journalcalendar" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -54,7 +54,7 @@
 		8D3867022F6154D3009053A1 /* journalcalendar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				8D3868EA2F648E64009053A1 /* Exceptions for "journalcalendar" folder in "journalcalendar" target */,
+				8D9B03EA2F84A4440026D6A8 /* Exceptions for "journalcalendar" folder in "journalcalendar" target */,
 			);
 			path = journalcalendar;
 			sourceTree = "<group>";
