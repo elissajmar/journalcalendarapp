@@ -24,25 +24,49 @@ class ModelData {
 
         do {
             let dateString = BlockDTO.dateFormatter.string(from: date)
+            let userIdString = userId.uuidString.lowercased()
 
-            let dtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+            // Fetch blocks for the exact date
+            let exactDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
                 .select("*, sub_blocks(*)")
                 .eq("date", value: dateString)
-                .eq("user_id", value: userId.uuidString.lowercased())
+                .eq("user_id", value: userIdString)
                 .order("start_time")
                 .execute()
                 .value
 
+            // Fetch recurring blocks from earlier dates
+            let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .lt("date", value: dateString)
+                .neq("recurrence", value: "never")
+                .eq("user_id", value: userIdString)
+                .order("start_time")
+                .execute()
+                .value
+
+            // Filter recurring blocks that match the selected date
+            let matchingRecurring = recurringDtos.filter { dto in
+                guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { return false }
+                let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+                return Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: date)
+            }
+
+            // Combine, deduplicating by id
+            let allDtos = exactDtos + matchingRecurring
+            var seenIds = Set<UUID>()
             var fetchedBlocks: [Block] = []
 
-            for dto in dtos {
+            for dto in allDtos {
+                guard seenIds.insert(dto.id).inserted else { continue }
+
                 let sortedSubDTOs = dto.subBlocks.sorted { $0.sortOrder < $1.sortOrder }
 
                 var subBlocks: [SubBlock] = []
                 for subDTO in sortedSubDTOs {
                     if subDTO.type == "images", let paths = subDTO.data.imagePaths, !paths.isEmpty {
-                        // Download images with a timeout so blocks still load if downloads stall
                         let imageData: [Data] = await withTaskGroup(of: Data?.self, returning: [Data].self) { group in
                             for path in paths {
                                 group.addTask {
@@ -76,7 +100,11 @@ class ModelData {
                     }
                 }
 
-                if let block = Block(dto: dto, subBlocks: subBlocks) {
+                if var block = Block(dto: dto, subBlocks: subBlocks) {
+                    // Adjust recurring blocks' times to the target date
+                    if !Calendar.current.isDate(block.startTime, inSameDayAs: date) {
+                        block = Self.adjustBlockToDate(block, targetDate: date)
+                    }
                     fetchedBlocks.append(block)
                 }
             }
@@ -87,11 +115,61 @@ class ModelData {
         }
     }
 
+    // MARK: - Recurrence Matching
+
+    /// Checks whether a block with the given recurrence and origin date
+    /// should appear on the target date.
+    private static func recurrenceMatches(_ recurrence: Recurrence, originDate: Date, targetDate: Date) -> Bool {
+        let calendar = Calendar.current
+        guard targetDate >= originDate else { return false }
+
+        switch recurrence {
+        case .never:
+            return false
+        case .daily:
+            return true
+        case .weekly:
+            return calendar.component(.weekday, from: originDate) == calendar.component(.weekday, from: targetDate)
+        case .monthly:
+            return calendar.component(.day, from: originDate) == calendar.component(.day, from: targetDate)
+        case .yearly:
+            return calendar.component(.day, from: originDate) == calendar.component(.day, from: targetDate)
+                && calendar.component(.month, from: originDate) == calendar.component(.month, from: targetDate)
+        }
+    }
+
+    /// Returns a copy of the block with startTime, endTime, and date
+    /// shifted to the target date while keeping the original time-of-day.
+    private static func adjustBlockToDate(_ block: Block, targetDate: Date) -> Block {
+        let calendar = Calendar.current
+        let startComps = calendar.dateComponents([.hour, .minute, .second], from: block.startTime)
+        let endComps = calendar.dateComponents([.hour, .minute, .second], from: block.endTime)
+
+        let newStart = calendar.date(bySettingHour: startComps.hour ?? 0,
+                                     minute: startComps.minute ?? 0,
+                                     second: startComps.second ?? 0,
+                                     of: targetDate) ?? block.startTime
+        let newEnd = calendar.date(bySettingHour: endComps.hour ?? 0,
+                                   minute: endComps.minute ?? 0,
+                                   second: endComps.second ?? 0,
+                                   of: targetDate) ?? block.endTime
+
+        return Block(
+            id: block.id,
+            date: calendar.startOfDay(for: targetDate),
+            startTime: newStart,
+            endTime: newEnd,
+            title: block.title,
+            recurrence: block.recurrence,
+            subBlocks: block.subBlocks
+        )
+    }
+
     // MARK: - Create
 
     /// Creates a new block in Supabase, uploads any images, and
     /// adds the block to the local array.
-    func createBlock(title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock], userId: UUID) async {
+    func createBlock(title: String, startTime: Date, endTime: Date, recurrence: Recurrence = .never, subBlocks: [SubBlock], userId: UUID) async {
         let calendar = Calendar.current
         let date = calendar.startOfDay(for: startTime)
         let blockId = UUID()
@@ -102,7 +180,8 @@ class ModelData {
             title: title,
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
-            endTime: BlockDTO.iso8601Formatter.string(from: endTime)
+            endTime: BlockDTO.iso8601Formatter.string(from: endTime),
+            recurrence: recurrence.rawValue
         )
 
         do {
@@ -136,7 +215,7 @@ class ModelData {
             // Add to local array so the UI updates immediately
             let newBlock = Block(
                 id: blockId, date: date, startTime: startTime,
-                endTime: endTime, title: title, subBlocks: subBlocks
+                endTime: endTime, title: title, recurrence: recurrence, subBlocks: subBlocks
             )
             blocks.append(newBlock)
 
@@ -149,7 +228,7 @@ class ModelData {
 
     /// Updates an existing block in Supabase. Replaces all sub-blocks
     /// (deletes old ones, inserts new ones).
-    func updateBlock(id: UUID, title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock], userId: UUID) async {
+    func updateBlock(id: UUID, title: String, startTime: Date, endTime: Date, recurrence: Recurrence = .never, subBlocks: [SubBlock], userId: UUID) async {
         let calendar = Calendar.current
         let date = calendar.startOfDay(for: startTime)
 
@@ -159,7 +238,8 @@ class ModelData {
             title: title,
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
-            endTime: BlockDTO.iso8601Formatter.string(from: endTime)
+            endTime: BlockDTO.iso8601Formatter.string(from: endTime),
+            recurrence: recurrence.rawValue
         )
 
         do {
@@ -221,6 +301,7 @@ class ModelData {
                 blocks[blockIndex].date = date
                 blocks[blockIndex].startTime = startTime
                 blocks[blockIndex].endTime = endTime
+                blocks[blockIndex].recurrence = recurrence
                 blocks[blockIndex].subBlocks = subBlocks
             }
 

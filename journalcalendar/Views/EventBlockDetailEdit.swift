@@ -17,6 +17,7 @@ struct EventBlockDetailEdit: View {
     @State private var title: String = ""
     @State private var startTime: Date = Date()
     @State private var endTime: Date = Date()
+    @State private var recurrence: Recurrence = .never
     @State private var subBlocks: [SubBlock] = []
     @State private var showDeleteAlert: Bool = false
     
@@ -45,6 +46,18 @@ struct EventBlockDetailEdit: View {
                             .datePickerStyle(.compact)
                             .labelsHidden()
                     }
+
+                    Picker(selection: $recurrence) {
+                        ForEach(Recurrence.allCases) { option in
+                            Text(option.displayName).tag(option)
+                        }
+                    } label: {
+                        Text(recurrence.displayName)
+                    }
+                    .pickerStyle(.menu)
+                    .font(.label)
+                    .textCase(.uppercase)
+                    .tint(.primary)
                 }
                 
                 SubBlockEditor(subBlocks: $subBlocks)
@@ -112,6 +125,7 @@ struct EventBlockDetailEdit: View {
         title = block.title
         startTime = block.startTime
         endTime = block.endTime
+        recurrence = block.recurrence
         subBlocks = block.subBlocks
     }
     
@@ -123,6 +137,7 @@ struct EventBlockDetailEdit: View {
                 title: title,
                 startTime: startTime,
                 endTime: endTime,
+                recurrence: recurrence,
                 subBlocks: subBlocks,
                 userId: userId
             )

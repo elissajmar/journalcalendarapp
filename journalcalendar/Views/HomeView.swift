@@ -180,6 +180,7 @@ struct HomeView: View {
                 title: block.title,
                 startTime: newTimes.start,
                 endTime: newTimes.end,
+                recurrence: block.recurrence,
                 subBlocks: block.subBlocks,
                 userId: userId
             )

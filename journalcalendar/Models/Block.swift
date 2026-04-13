@@ -7,12 +7,33 @@
 
 import Foundation
 
+enum Recurrence: String, CaseIterable, Identifiable {
+    case never = "never"
+    case daily = "daily"
+    case weekly = "weekly"
+    case monthly = "monthly"
+    case yearly = "yearly"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .never: return "Never Repeats"
+        case .daily: return "Daily"
+        case .weekly: return "Weekly"
+        case .monthly: return "Monthly"
+        case .yearly: return "Yearly"
+        }
+    }
+}
+
 struct Block: Identifiable {
     let id: UUID
     var date: Date
     var startTime: Date
     var endTime: Date
     var title: String
+    var recurrence: Recurrence
     var subBlocks: [SubBlock]
 
     init(
@@ -21,6 +42,7 @@ struct Block: Identifiable {
         startTime: Date,
         endTime: Date,
         title: String,
+        recurrence: Recurrence = .never,
         subBlocks: [SubBlock] = []
     ) {
         self.id = id
@@ -28,6 +50,7 @@ struct Block: Identifiable {
         self.startTime = startTime
         self.endTime = endTime
         self.title = title
+        self.recurrence = recurrence
         self.subBlocks = subBlocks
     }
 

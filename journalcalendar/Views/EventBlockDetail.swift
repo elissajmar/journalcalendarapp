@@ -32,6 +32,11 @@ struct EventBlockDetail: View {
                             
                             Text(timeRangeString(for: block))
                                 .labelStyle()
+
+                            if block.recurrence != .never {
+                                Text("Repeats \(block.recurrence.displayName)")
+                                    .labelStyle()
+                            }
                         }
                         
                         // Sub-blocks
