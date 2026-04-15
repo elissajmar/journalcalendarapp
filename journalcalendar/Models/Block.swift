@@ -35,6 +35,9 @@ struct Block: Identifiable {
     var title: String
     var recurrence: Recurrence
     var subBlocks: [SubBlock]
+    var originalDate: Date
+    var exceptions: [String]
+    var recurrenceEnd: Date?
 
     init(
         id: UUID = UUID(),
@@ -43,7 +46,10 @@ struct Block: Identifiable {
         endTime: Date,
         title: String,
         recurrence: Recurrence = .never,
-        subBlocks: [SubBlock] = []
+        subBlocks: [SubBlock] = [],
+        originalDate: Date? = nil,
+        exceptions: [String] = [],
+        recurrenceEnd: Date? = nil
     ) {
         self.id = id
         self.date = date
@@ -52,6 +58,9 @@ struct Block: Identifiable {
         self.title = title
         self.recurrence = recurrence
         self.subBlocks = subBlocks
+        self.originalDate = originalDate ?? date
+        self.exceptions = exceptions
+        self.recurrenceEnd = recurrenceEnd
     }
 
     /// The text from the first journal sub-block, or empty string.

@@ -20,6 +20,7 @@ struct EventBlockDetailEdit: View {
     @State private var recurrence: Recurrence = .never
     @State private var subBlocks: [SubBlock] = []
     @State private var showDeleteAlert: Bool = false
+    @State private var showRecurringDeleteDialog: Bool = false
     
     private var block: Block? {
         modelData.blocks.first(where: { $0.id == blockId })
@@ -74,6 +75,20 @@ struct EventBlockDetailEdit: View {
         } message: {
             Text("Are you sure you want to delete this event? This action cannot be undone.")
         }
+        .confirmationDialog("Delete Recurring Event", isPresented: $showRecurringDeleteDialog, titleVisibility: .visible) {
+            Button("Delete This Event", role: .destructive) {
+                deleteThisInstance()
+            }
+            Button("Delete This and All Future Events", role: .destructive) {
+                deleteThisAndFuture()
+            }
+            Button("Delete All Events", role: .destructive) {
+                deleteBlock()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This is a recurring event.")
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
@@ -88,7 +103,11 @@ struct EventBlockDetailEdit: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     Button {
-                        showDeleteAlert = true
+                        if let block = block, block.recurrence != .never {
+                            showRecurringDeleteDialog = true
+                        } else {
+                            showDeleteAlert = true
+                        }
                     } label: {
                         Image(systemName: "trash")
                             .font(.body)
@@ -148,6 +167,28 @@ struct EventBlockDetailEdit: View {
     private func deleteBlock() {
         Task {
             await modelData.deleteBlock(id: blockId)
+        }
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            dismiss()
+        }
+    }
+
+    private func deleteThisInstance() {
+        guard let block = block else { return }
+        Task {
+            await modelData.deleteBlockInstance(id: blockId, date: block.date)
+        }
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            dismiss()
+        }
+    }
+
+    private func deleteThisAndFuture() {
+        guard let block = block else { return }
+        Task {
+            await modelData.deleteBlockAndFuture(id: blockId, fromDate: block.date)
         }
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

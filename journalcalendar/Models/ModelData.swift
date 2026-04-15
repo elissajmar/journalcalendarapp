@@ -51,16 +51,23 @@ class ModelData {
             let matchingRecurring = recurringDtos.filter { dto in
                 guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { return false }
                 let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
-                return Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: date)
+                let recurrenceEnd = dto.recurrenceEnd.flatMap { BlockDTO.dateFormatter.date(from: $0) }
+                return Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: date, exceptions: dto.exceptions ?? [], recurrenceEnd: recurrenceEnd)
             }
 
             // Combine, deduplicating by id
             let allDtos = exactDtos + matchingRecurring
             var seenIds = Set<UUID>()
             var fetchedBlocks: [Block] = []
+            let targetDateString = BlockDTO.dateFormatter.string(from: date)
 
             for dto in allDtos {
                 guard seenIds.insert(dto.id).inserted else { continue }
+
+                // Skip if this date is in the block's exceptions list
+                if (dto.exceptions ?? []).contains(targetDateString) {
+                    continue
+                }
 
                 let sortedSubDTOs = dto.subBlocks.sorted { $0.sortOrder < $1.sortOrder }
 
@@ -119,9 +126,20 @@ class ModelData {
 
     /// Checks whether a block with the given recurrence and origin date
     /// should appear on the target date.
-    private static func recurrenceMatches(_ recurrence: Recurrence, originDate: Date, targetDate: Date) -> Bool {
+    private static func recurrenceMatches(_ recurrence: Recurrence, originDate: Date, targetDate: Date, exceptions: [String] = [], recurrenceEnd: Date? = nil) -> Bool {
         let calendar = Calendar.current
         guard targetDate >= originDate else { return false }
+
+        // Check if target date is past the recurrence end
+        if let endDate = recurrenceEnd, calendar.startOfDay(for: targetDate) > calendar.startOfDay(for: endDate) {
+            return false
+        }
+
+        // Check if target date is in exceptions
+        let targetDateString = BlockDTO.dateFormatter.string(from: targetDate)
+        if exceptions.contains(targetDateString) {
+            return false
+        }
 
         switch recurrence {
         case .never:
@@ -161,7 +179,10 @@ class ModelData {
             endTime: newEnd,
             title: block.title,
             recurrence: block.recurrence,
-            subBlocks: block.subBlocks
+            subBlocks: block.subBlocks,
+            originalDate: block.originalDate,
+            exceptions: block.exceptions,
+            recurrenceEnd: block.recurrenceEnd
         )
     }
 
@@ -181,7 +202,9 @@ class ModelData {
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
             endTime: BlockDTO.iso8601Formatter.string(from: endTime),
-            recurrence: recurrence.rawValue
+            recurrence: recurrence.rawValue,
+            exceptions: nil,
+            recurrenceEnd: nil
         )
 
         do {
@@ -239,7 +262,9 @@ class ModelData {
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
             endTime: BlockDTO.iso8601Formatter.string(from: endTime),
-            recurrence: recurrence.rawValue
+            recurrence: recurrence.rawValue,
+            exceptions: nil,
+            recurrenceEnd: nil
         )
 
         do {
@@ -311,6 +336,89 @@ class ModelData {
     }
 
     // MARK: - Delete
+
+    /// Helper structs for partial Supabase updates.
+    private struct ExceptionsUpdate: Codable {
+        let exceptions: [String]
+    }
+
+    private struct RecurrenceEndUpdate: Codable {
+        let recurrenceEnd: String
+
+        enum CodingKeys: String, CodingKey {
+            case recurrenceEnd = "recurrence_end"
+        }
+    }
+
+    /// Deletes a single instance of a recurring block by adding
+    /// the date to the exceptions list.
+    func deleteBlockInstance(id: UUID, date: Date) async {
+        do {
+            // Fetch current block to get existing exceptions
+            let blockDTOs: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .eq("id", value: id.uuidString)
+                .execute()
+                .value
+
+            guard let dto = blockDTOs.first else { return }
+
+            var exceptions = dto.exceptions ?? []
+            let dateString = BlockDTO.dateFormatter.string(from: date)
+            if !exceptions.contains(dateString) {
+                exceptions.append(dateString)
+            }
+
+            try await AppSupabase.client.from("blocks")
+                .update(ExceptionsUpdate(exceptions: exceptions))
+                .eq("id", value: id.uuidString)
+                .execute()
+
+            // Remove from local array so UI updates immediately
+            blocks.removeAll { $0.id == id }
+        } catch {
+            print("Error adding exception to block: \(error)")
+        }
+    }
+
+    /// Deletes this instance and all future instances of a recurring block.
+    /// If the date is the origin date, deletes the entire block.
+    /// Otherwise, sets the recurrence end to the day before the given date.
+    func deleteBlockAndFuture(id: UUID, fromDate: Date) async {
+        do {
+            // Fetch the original block to check if this is the origin date
+            let blockDTOs: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .eq("id", value: id.uuidString)
+                .execute()
+                .value
+
+            guard let dto = blockDTOs.first,
+                  let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { return }
+
+            let calendar = Calendar.current
+            if calendar.isDate(originDate, inSameDayAs: fromDate) {
+                // Deleting from the origin date means delete everything
+                await deleteBlock(id: id)
+            } else {
+                // Set recurrence end to the day before fromDate
+                guard let dayBefore = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: fromDate)) else { return }
+                let endDateString = BlockDTO.dateFormatter.string(from: dayBefore)
+
+                try await AppSupabase.client.from("blocks")
+                    .update(RecurrenceEndUpdate(recurrenceEnd: endDateString))
+                    .eq("id", value: id.uuidString)
+                    .execute()
+
+                // Remove from local array
+                blocks.removeAll { $0.id == id }
+            }
+        } catch {
+            print("Error ending recurrence: \(error)")
+        }
+    }
 
     /// Deletes a block from Supabase and removes associated images
     /// from Storage. Cascade delete handles sub-block rows.
