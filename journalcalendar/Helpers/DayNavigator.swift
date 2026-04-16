@@ -18,17 +18,13 @@ final class DayNavigator {
             : .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
     }
 
-    func goToPreviousDay() {
-        swipeDirection = -1
+    func advance(days: Int) {
+        swipeDirection = days > 0 ? 1 : -1
         withAnimation(.easeInOut(duration: 0.3)) {
-            selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+            selectedDate = Calendar.current.date(byAdding: .day, value: days, to: selectedDate) ?? selectedDate
         }
     }
 
-    func goToNextDay() {
-        swipeDirection = 1
-        withAnimation(.easeInOut(duration: 0.3)) {
-            selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
-        }
-    }
+    func goToPreviousDay() { advance(days: -1) }
+    func goToNextDay() { advance(days: 1) }
 }
