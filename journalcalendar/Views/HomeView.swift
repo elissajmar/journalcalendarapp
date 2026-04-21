@@ -16,86 +16,39 @@ struct HomeView: View {
     @Environment(ModelData.self) var modelData
     @Environment(AuthController.self) var auth
 
-    @State private var selectedDate = Date()
+    @State private var isMonthlyView = false
     @State private var selectedBlockId: UUID?
     @State private var showAddBlock = false
-    
-    @State private var hourHeight: CGFloat = 120
-    @State private var scrollOffset: CGFloat = 0
-    @State private var viewportHeight: CGFloat = 0
-    
-    private var drag: BlockDragHelper { BlockDragHelper(hourHeight: hourHeight) }
-    
-    private var offscreenCounts: OffscreenBlockCounter.Result {
-        let counter = OffscreenBlockCounter(layout: BlockLayoutEngine(hourHeight: hourHeight))
-        return counter.count(blocks: todaysBlocks, scrollOffset: scrollOffset, viewportHeight: viewportHeight)
-    }
-    
+    @State private var selectedDate: Date?
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header with date and Block button
-            header
-            
-            Divider()
-            
-            // Calendar view with time slots
-            ScrollViewReader { proxy in
-                ScrollView {
-                    CalendarGridView(
-                        blocks: todaysBlocks,
-                        hourHeight: $hourHeight,
-                        onBlockTapped: { block in
-                            selectedBlockId = block.id
-                        },
-                        onBlockDragFinished: { block, translation in
-                            finishDrag(for: block, translation: translation)
-                        }
-                    )
-                    .pinchToZoom(hourHeight: $hourHeight, min: 40, max: 240)
+        ZStack {
+            if isMonthlyView {
+                MonthlyCalendarView(isMonthlyView: $isMonthlyView) { date in
+                    selectedDate = date
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        isMonthlyView = false
+                    }
                 }
-                .onScrollGeometryChange(for: CGFloat.self) { geo in
-                    geo.contentOffset.y + geo.contentInsets.top
-                } action: { _, newValue in
-                    scrollOffset = newValue
-                }
-                .onScrollGeometryChange(for: CGFloat.self) { geo in
-                    geo.visibleRect.height
-                } action: { _, newValue in
-                    viewportHeight = newValue
-                }
-                .onAppear {
-                    proxy.scrollTo(8, anchor: .top)
-                }
+                .transition(.move(edge: .leading))
+            } else {
+                DayCalendarView(
+                    isMonthlyView: $isMonthlyView,
+                    selectedBlockId: $selectedBlockId,
+                    showAddBlock: $showAddBlock,
+                    initialDate: selectedDate
+                )
+                .transition(.move(edge: .trailing))
             }
-            .overlay(alignment: .top) {
-                if offscreenCounts.aboveCount > 0 {
-                    MoreEventsPill(count: offscreenCounts.aboveCount, direction: .up)
-                        .padding(.top, 8)
-                        .transition(.opacity)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if offscreenCounts.belowCount > 0 {
-                    MoreEventsPill(count: offscreenCounts.belowCount, direction: .down)
-                        .padding(.bottom, 8)
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.25), value: offscreenCounts.aboveCount)
-            .animation(.easeInOut(duration: 0.25), value: offscreenCounts.belowCount)
         }
-        .background(Color("AppBackground"))
+        .animation(.easeInOut(duration: 0.35), value: isMonthlyView)
         .sheet(item: $selectedBlockId) { blockId in
             EventBlockDetail(blockId: blockId)
                 .environment(modelData)
                 .environment(auth)
         }
-        .task(id: selectedDate) {
-            guard let userId = auth.currentUserId else { return }
-            await modelData.fetchBlocks(for: selectedDate, userId: userId)
-        }
         .sheet(isPresented: $showAddBlock) {
-            AddEventBlock(initialDate: selectedDate)
+            AddEventBlock(initialDate: selectedDate ?? Date())
                 .environment(modelData)
                 .environment(auth)
         }

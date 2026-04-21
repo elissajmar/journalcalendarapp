@@ -31,7 +31,7 @@ struct MoreEventsPill: View {
             Text("\(count) MORE")
                 .font(.label)
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color("TextSecondary"))
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(Color("PillBackground"))

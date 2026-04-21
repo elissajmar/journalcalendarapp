@@ -86,7 +86,7 @@ struct EventBlockDetail: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.body)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color("TextSecondary"))
                         }
                         .buttonStyle(.plain)
                     }
@@ -121,7 +121,7 @@ struct EventBlockDetail: View {
             } else {
                 Text("Block not found")
                     .paragraph1Style()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
@@ -130,7 +130,7 @@ struct EventBlockDetail: View {
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.body)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color("TextSecondary"))
                             }
                             .buttonStyle(.plain)
                         }

@@ -16,12 +16,10 @@ class ModelData {
 
     // MARK: - Fetch
 
-    /// Fetches all blocks for the given date from Supabase,
-    /// including their sub-blocks and downloaded images.
+    /// Fetches all blocks for a single date.
     func fetchBlocks(for date: Date, userId: UUID) async {
         isLoading = true
         defer { isLoading = false }
-
         do {
             let dateString = BlockDTO.dateFormatter.string(from: date)
             let userIdString = userId.uuidString.lowercased()
@@ -35,7 +33,53 @@ class ModelData {
                 .order("start_time")
                 .execute()
                 .value
+            blocks = await processBlockDTOs(dtos)
+        } catch {
+            print("Error fetching blocks: \(error)")
+        }
+    }
 
+    /// Fetches all blocks across multiple dates (e.g. for the 3-day view).
+    func fetchBlocks(for dates: [Date], userId: UUID) async {
+        guard !dates.isEmpty else { blocks = []; return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let dateStrings = dates.map { BlockDTO.dateFormatter.string(from: $0) }
+            let dtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .in("date", value: dateStrings)
+                .eq("user_id", value: userId.uuidString.lowercased())
+                .order("start_time")
+                .execute()
+                .value
+            blocks = await processBlockDTOs(dtos)
+        } catch {
+            print("Error fetching blocks for multiple dates: \(error)")
+        }
+    }
+
+    /// Converts raw joined DTOs into fully hydrated Block values,
+    /// downloading any image sub-block data along the way.
+    private func processBlockDTOs(_ dtos: [BlockWithSubBlocksDTO]) async -> [Block] {
+        var fetchedBlocks: [Block] = []
+        for dto in dtos {
+            let sortedSubDTOs = dto.subBlocks.sorted { $0.sortOrder < $1.sortOrder }
+            var subBlocks: [SubBlock] = []
+            for subDTO in sortedSubDTOs {
+                if subDTO.type == "images", let paths = subDTO.data.imagePaths, !paths.isEmpty {
+                    let imageData: [Data] = await withTaskGroup(of: Data?.self, returning: [Data].self) { group in
+                        for path in paths {
+                            group.addTask {
+                                do {
+                                    return try await withThrowingTaskGroup(of: Data.self) { inner in
+                                        inner.addTask {
+                                            try await ImageStorageService.download(path: path)
+                                        }
+                                        inner.addTask {
+                                            try await Task.sleep(for: .seconds(10))
+                                            throw CancellationError()
             // Fetch recurring blocks from earlier dates
             let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
@@ -90,21 +134,24 @@ class ModelData {
                                             inner.cancelAll()
                                             return result
                                         }
-                                    } catch {
-                                        return nil
+                                        let result = try await inner.next()!
+                                        inner.cancelAll()
+                                        return result
                                     }
+                                } catch {
+                                    return nil
                                 }
                             }
-                            var results: [Data] = []
-                            for await data in group {
-                                if let data { results.append(data) }
-                            }
-                            return results
                         }
-                        subBlocks.append(SubBlock(dto: subDTO, imageData: imageData))
-                    } else {
-                        subBlocks.append(SubBlock(dto: subDTO))
+                        var results: [Data] = []
+                        for await data in group {
+                            if let data { results.append(data) }
+                        }
+                        return results
                     }
+                    subBlocks.append(SubBlock(dto: subDTO, imageData: imageData))
+                } else {
+                    subBlocks.append(SubBlock(dto: subDTO))
                 }
 
                 if var block = Block(dto: dto, subBlocks: subBlocks) {
@@ -115,11 +162,11 @@ class ModelData {
                     fetchedBlocks.append(block)
                 }
             }
-
-            blocks = fetchedBlocks
-        } catch {
-            print("Error fetching blocks: \(error)")
+            if let block = Block(dto: dto, subBlocks: subBlocks) {
+                fetchedBlocks.append(block)
+            }
         }
+        return fetchedBlocks
     }
 
     // MARK: - Recurrence Matching

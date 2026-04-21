@@ -37,7 +37,7 @@ struct Heading2TextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.heading2)
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color("TextPrimary"))
     }
 }
 
@@ -45,7 +45,7 @@ struct Heading3TextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.heading3)
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color("TextPrimary"))
     }
 }
 
@@ -53,7 +53,7 @@ struct Paragraph1TextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.paragraph1)
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color("TextPrimary"))
             .lineSpacing(4)
     }
 }
@@ -62,7 +62,7 @@ struct LabelTextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.label)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color("TextSecondary"))
             .textCase(.uppercase)
     }
 }

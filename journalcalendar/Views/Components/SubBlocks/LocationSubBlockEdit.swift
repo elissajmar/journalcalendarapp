@@ -33,7 +33,7 @@ struct LocationSubBlockEdit: View {
                 HStack {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color("TextSecondary"))
                     
                     Text("LOCATION")
                         .labelStyle()
@@ -47,7 +47,7 @@ struct LocationSubBlockEdit: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                 }
             }
@@ -110,7 +110,7 @@ struct LocationSubBlockEdit: View {
             TextField("Search for a place", text: $searchService.queryFragment)
                 .font(.paragraph1)
                 .padding(12)
-                .background(Color(uiColor: .secondarySystemBackground))
+                .background(Color("SecondaryButtonFill"))
                 .cornerRadius(8)
             
             if !searchService.results.isEmpty {
@@ -122,7 +122,7 @@ struct LocationSubBlockEdit: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(completion.title)
                                     .font(.paragraph1)
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color("TextPrimary"))
                                 if !completion.subtitle.isEmpty {
                                     Text(completion.subtitle)
                                         .labelStyle()
@@ -140,7 +140,7 @@ struct LocationSubBlockEdit: View {
                         }
                     }
                 }
-                .background(Color(uiColor: .secondarySystemBackground))
+                .background(Color("SecondaryButtonFill"))
                 .cornerRadius(8)
             }
         }
