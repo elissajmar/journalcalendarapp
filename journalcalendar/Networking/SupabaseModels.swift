@@ -19,12 +19,16 @@ struct BlockDTO: Codable {
     let date: String        // yyyy-MM-dd
     let startTime: String   // ISO8601 timestamptz
     let endTime: String     // ISO8601 timestamptz
+    let recurrence: String  // "never", "daily", "weekly", "monthly", "yearly"
+    let exceptions: [String]?      // dates (yyyy-MM-dd) to skip
+    let recurrenceEnd: String?     // last date (yyyy-MM-dd) for recurrence
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date
+        case id, title, date, recurrence, exceptions
         case userId = "user_id"
         case startTime = "start_time"
         case endTime = "end_time"
+        case recurrenceEnd = "recurrence_end"
     }
 }
 
@@ -72,13 +76,17 @@ struct BlockWithSubBlocksDTO: Codable {
     let date: String
     let startTime: String
     let endTime: String
+    let recurrence: String?
+    let exceptions: [String]?
+    let recurrenceEnd: String?
     let subBlocks: [SubBlockDTO]
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date
+        case id, title, date, recurrence, exceptions
         case userId = "user_id"
         case startTime = "start_time"
         case endTime = "end_time"
+        case recurrenceEnd = "recurrence_end"
         case subBlocks = "sub_blocks"
     }
 }
@@ -128,7 +136,10 @@ extension Block {
             title: title,
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
-            endTime: BlockDTO.iso8601Formatter.string(from: endTime)
+            endTime: BlockDTO.iso8601Formatter.string(from: endTime),
+            recurrence: recurrence.rawValue,
+            exceptions: exceptions.isEmpty ? nil : exceptions,
+            recurrenceEnd: recurrenceEnd.map { BlockDTO.dateFormatter.string(from: $0) }
         )
     }
 
@@ -139,13 +150,19 @@ extension Block {
               let endTime = BlockDTO.parseISO8601(dto.endTime) else {
             return nil
         }
+        let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+        let recurrenceEnd = dto.recurrenceEnd.flatMap { BlockDTO.dateFormatter.date(from: $0) }
         self.init(
             id: dto.id,
             date: date,
             startTime: startTime,
             endTime: endTime,
             title: dto.title,
-            subBlocks: subBlocks
+            recurrence: recurrence,
+            subBlocks: subBlocks,
+            originalDate: date,
+            exceptions: dto.exceptions ?? [],
+            recurrenceEnd: recurrenceEnd
         )
     }
 }
