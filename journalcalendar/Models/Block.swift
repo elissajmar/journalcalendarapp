@@ -7,13 +7,37 @@
 
 import Foundation
 
+enum Recurrence: String, CaseIterable, Identifiable {
+    case never = "never"
+    case daily = "daily"
+    case weekly = "weekly"
+    case monthly = "monthly"
+    case yearly = "yearly"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .never: return "Never Repeats"
+        case .daily: return "Daily"
+        case .weekly: return "Weekly"
+        case .monthly: return "Monthly"
+        case .yearly: return "Yearly"
+        }
+    }
+}
+
 struct Block: Identifiable {
     let id: UUID
     var date: Date
     var startTime: Date
     var endTime: Date
     var title: String
+    var recurrence: Recurrence
     var subBlocks: [SubBlock]
+    var originalDate: Date
+    var exceptions: [String]
+    var recurrenceEnd: Date?
 
     init(
         id: UUID = UUID(),
@@ -21,14 +45,22 @@ struct Block: Identifiable {
         startTime: Date,
         endTime: Date,
         title: String,
-        subBlocks: [SubBlock] = []
+        recurrence: Recurrence = .never,
+        subBlocks: [SubBlock] = [],
+        originalDate: Date? = nil,
+        exceptions: [String] = [],
+        recurrenceEnd: Date? = nil
     ) {
         self.id = id
         self.date = date
         self.startTime = startTime
         self.endTime = endTime
         self.title = title
+        self.recurrence = recurrence
         self.subBlocks = subBlocks
+        self.originalDate = originalDate ?? date
+        self.exceptions = exceptions
+        self.recurrenceEnd = recurrenceEnd
     }
 
     /// The text from the first journal sub-block, or empty string.

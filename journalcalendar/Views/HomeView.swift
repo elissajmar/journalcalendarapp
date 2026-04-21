@@ -53,6 +53,92 @@ struct HomeView: View {
                 .environment(auth)
         }
     }
+    
+    // MARK: - Header
+    
+    private var header: some View {
+        HStack(spacing: 16) {
+            // Navigation arrows
+            Button(action: { previousDay() }) {
+                Image(systemName: "chevron.left")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Button(action: { nextDay() }) {
+                Image(systemName: "chevron.right")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            
+            // Date display
+            Text(DateFormatters.shortDate(from: selectedDate))
+                .heading2Style()
+            
+            Spacer()
+            
+            // Sign out button
+            Button {
+                Task { try? await auth.signOut() }
+            } label: {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            
+            // Add Block button
+            Button(action: { showAddBlock = true }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                    Text("Block")
+                }
+                .font(.label)
+                .textCase(.uppercase)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.brown)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .padding()
+    }
+    
+    // MARK: - Helpers
+    
+    private var todaysBlocks: [Block] {
+        let calendar = Calendar.current
+        return modelData.blocks.filter { block in
+            calendar.isDate(block.startTime, inSameDayAs: selectedDate)
+        }
+    }
+    
+    private func previousDay() {
+        selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+    }
+    
+    private func nextDay() {
+        selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+    }
+    
+    private func finishDrag(for block: Block, translation: CGFloat) {
+        guard let newTimes = drag.newTimes(for: block, translation: translation) else {
+            return
+        }
+        guard let userId = auth.currentUserId else { return }
+        
+        Task {
+            await modelData.updateBlock(
+                id: block.id,
+                title: block.title,
+                startTime: newTimes.start,
+                endTime: newTimes.end,
+                recurrence: block.recurrence,
+                subBlocks: block.subBlocks,
+                userId: userId
+            )
+        }
+    }
 }
 
 #Preview {
