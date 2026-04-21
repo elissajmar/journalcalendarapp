@@ -43,7 +43,7 @@ struct AddEventBlock: View {
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("Add title", text: $title)
                             .font(.heading3)
-                            .foregroundStyle(title.isEmpty ? .secondary : .primary)
+                            .foregroundStyle(title.isEmpty ? Color("TextSecondary") : Color("TextPrimary"))
                             .textFieldStyle(.plain)
                         
                         HStack(spacing: 12) {
@@ -72,7 +72,7 @@ struct AddEventBlock: View {
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.body)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color("TextPrimary"))
                     }
                     .buttonStyle(.plain)
                 }
@@ -84,7 +84,7 @@ struct AddEventBlock: View {
                         } label: {
                             Image(systemName: "trash")
                                 .font(.body)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color("TextSecondary"))
                         }
                         .buttonStyle(.plain)
                         

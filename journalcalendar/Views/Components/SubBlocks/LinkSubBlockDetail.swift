@@ -30,7 +30,7 @@ struct LinkSubBlockDetail: View {
             } else {
                 Text(url)
                     .font(.paragraph1)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
             }
         }
     }

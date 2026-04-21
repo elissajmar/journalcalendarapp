@@ -12,8 +12,8 @@ struct BrownButtonStyle: ButtonStyle {
         configuration.label
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(hex: "7A6559"))
-            .foregroundStyle(.white)
+            .background(Color("ButtonPrimary"))
+            .foregroundStyle(Color("TextPrimaryLight"))
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .opacity(configuration.isPressed ? 0.7 : 1.0)
     }

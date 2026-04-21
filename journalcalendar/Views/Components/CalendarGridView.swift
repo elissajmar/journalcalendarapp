@@ -65,7 +65,7 @@ struct CalendarGridView: View {
                                 let baseY = layout.yOffset(for: position.block) + 8
                                 
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemBackground))
+                                    .fill(Color("CardFill"))
                                     .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
                                     .opacity(0.5)
                                     .frame(width: geometry.size.width / CGFloat(position.totalColumns))
@@ -141,7 +141,7 @@ struct CalendarGridView: View {
                 }
             }
             .frame(width: 72)
-            .background(Color("AppBackground"))
+            .background(Color("BG"))
             .allowsHitTesting(false)
         }
         .padding(.vertical)

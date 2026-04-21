@@ -71,7 +71,7 @@ struct ThreeDayCalendarGridView: View {
                 }
             }
             .frame(width: 72)
-            .background(Color("AppBackground"))
+            .background(Color("BG"))
             .allowsHitTesting(false)
         }
         .padding(.vertical)

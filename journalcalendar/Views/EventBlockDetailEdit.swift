@@ -68,7 +68,7 @@ struct EventBlockDetailEdit: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.body)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color("TextPrimary"))
                 }
             }
             
@@ -79,7 +79,7 @@ struct EventBlockDetailEdit: View {
                     } label: {
                         Image(systemName: "trash")
                             .font(.body)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                     
                     Button {
@@ -93,8 +93,8 @@ struct EventBlockDetailEdit: View {
                         .textCase(.uppercase)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color(uiColor: .secondarySystemBackground))
-                        .foregroundStyle(.primary)
+                        .background(Color("SecondaryButtonFill"))
+                        .foregroundStyle(Color("TextPrimary"))
                         .cornerRadius(8)
                     }
                 }

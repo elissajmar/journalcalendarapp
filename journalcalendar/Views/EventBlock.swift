@@ -78,7 +78,7 @@ struct EventBlock: View {
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Color(.systemBackground))
+        .background(Color("CardFill"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
         .padding(.trailing, 4)
