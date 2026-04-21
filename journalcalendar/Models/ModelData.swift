@@ -105,6 +105,37 @@ class ModelData {
         return fetchedBlocks
     }
 
+    /// Fetches all blocks in a date range (inclusive). Used by the monthly view.
+    /// Skips image downloads since only titles are needed.
+    func fetchBlocks(from startDate: Date, to endDate: Date, userId: UUID) async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let start = BlockDTO.dateFormatter.string(from: startDate)
+            let end = BlockDTO.dateFormatter.string(from: endDate)
+            let dtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .gte("date", value: start)
+                .lte("date", value: end)
+                .eq("user_id", value: userId.uuidString.lowercased())
+                .order("start_time")
+                .execute()
+                .value
+            var fetched: [Block] = []
+            for dto in dtos {
+                let sortedSubDTOs = dto.subBlocks.sorted { $0.sortOrder < $1.sortOrder }
+                let subBlocks = sortedSubDTOs.map { SubBlock(dto: $0) }
+                if let block = Block(dto: dto, subBlocks: subBlocks) {
+                    fetched.append(block)
+                }
+            }
+            blocks = fetched
+        } catch {
+            print("Error fetching blocks for range: \(error)")
+        }
+    }
+
     // MARK: - Create
 
     /// Creates a new block in Supabase, uploads any images, and

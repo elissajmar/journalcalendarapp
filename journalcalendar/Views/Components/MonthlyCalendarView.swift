@@ -111,7 +111,11 @@ struct MonthlyCalendarView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Button(action: { isMonthlyView = false }) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    isMonthlyView = false
+                }
+            }) {
                 Image(systemName: "chevron.left")
                     .font(.body)
                     .foregroundStyle(Color("TextSecondary"))
@@ -263,7 +267,7 @@ private struct MonthSection: View {
                 .foregroundStyle(Color("TextPrimary"))
                 .padding(.trailing, 16)
                 .padding(.top, 20)
-                .padding(.bottom, 8)
+                .padding(.bottom, 14)
 
             // Weeks grid
             ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
@@ -285,35 +289,36 @@ private struct WeekRow: View {
     let onDateSelected: (Date) -> Void
 
     private let calendar = Calendar.current
-    private let dateKeyFormatter: DateFormatter = {
+    private static let dateKeyFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
 
-    /// Events that need to be displayed on this row
+    private let eventPillHeight: CGFloat = 18
+    private let eventSpacing: CGFloat = 2
+    private let maxEvents = 4
+
     private var rowEvents: [RowEvent] {
         var events: [RowEvent] = []
         var seen: Set<UUID> = []
 
         for (colIndex, date) in week.enumerated() {
             guard let date else { continue }
-            let key = dateKeyFormatter.string(from: date)
+            let key = Self.dateKeyFormatter.string(from: date)
             for block in blocksByDate[key] ?? [] {
                 guard !seen.contains(block.id) else { continue }
                 seen.insert(block.id)
 
-                // Check if block spans multiple days
                 let startDay = calendar.startOfDay(for: block.startTime)
                 let endDay = calendar.startOfDay(for: block.endTime)
 
                 if startDay == endDay {
-                    // Single-day event
                     events.append(RowEvent(block: block, startCol: colIndex, endCol: colIndex))
                 } else {
-                    // Multi-day event - clamp to this week
-                    let eventEndCol = min(6, colIndex + calendar.dateComponents([.day], from: startDay, to: endDay).day!)
-                    events.append(RowEvent(block: block, startCol: colIndex, endCol: min(eventEndCol, 6)))
+                    let daySpan = calendar.dateComponents([.day], from: startDay, to: endDay).day ?? 0
+                    let eventEndCol = min(6, colIndex + daySpan)
+                    events.append(RowEvent(block: block, startCol: colIndex, endCol: eventEndCol))
                 }
             }
         }
@@ -321,8 +326,15 @@ private struct WeekRow: View {
         return events.sorted { $0.startCol < $1.startCol }
     }
 
+    /// Fixed height for the event area (fits 4 pills regardless of content)
+    private var eventsAreaHeight: CGFloat {
+        CGFloat(maxEvents) * eventPillHeight + CGFloat(maxEvents - 1) * eventSpacing
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        let events = Array(rowEvents.prefix(maxEvents))
+
+        VStack(alignment: .leading, spacing: 4) {
             // Date numbers
             HStack(spacing: 0) {
                 ForEach(0..<7, id: \.self) { index in
@@ -332,15 +344,15 @@ private struct WeekRow: View {
                             onDateSelected(date)
                         } label: {
                             Text("\(calendar.component(.day, from: date))")
-                                .font(.paragraph1)
-                                .foregroundStyle(isToday ? .white : Color("TextPrimary"))
+                                .font(.label)
+                                .foregroundStyle(isToday ? .white : Color("TextSecondary"))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 4)
                                 .background {
                                     if isToday {
                                         Circle()
                                             .fill(Color("ButtonPrimary"))
-                                            .frame(width: 28, height: 28)
+                                            .frame(width: 24, height: 24)
                                     }
                                 }
                         }
@@ -351,39 +363,31 @@ private struct WeekRow: View {
                 }
             }
 
-            // Event pills
-            let events = rowEvents
-            if !events.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(events.prefix(3), id: \.block.id) { event in
-                        eventPill(event)
+            // Event area — always reserves space for 4 pills
+            GeometryReader { geo in
+                let colWidth = geo.size.width / 7.0
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(events.enumerated()), id: \.element.block.id) { rowIndex, event in
+                        let x = colWidth * CGFloat(event.startCol) + 2
+                        let pillWidth = colWidth * CGFloat(event.endCol - event.startCol + 1) - 4
+                        let y = CGFloat(rowIndex) * (eventPillHeight + eventSpacing)
+
+                        Text(event.block.title)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color("TextPrimary"))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .padding(.horizontal, 4)
+                            .frame(width: max(pillWidth, 0), height: eventPillHeight, alignment: .leading)
+                            .background(Color("CardFill"))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .offset(x: x, y: y)
                     }
                 }
             }
+            .frame(height: eventsAreaHeight)
         }
-        .padding(.bottom, 4)
-        .frame(minHeight: 70, alignment: .top)
-    }
-
-    private func eventPill(_ event: RowEvent) -> some View {
-        GeometryReader { geo in
-            let colWidth = geo.size.width / 7.0
-            let xOffset = colWidth * CGFloat(event.startCol)
-            let pillWidth = colWidth * CGFloat(event.endCol - event.startCol + 1) - 4
-
-            Text(event.block.title)
-                .font(.system(size: 11))
-                .foregroundStyle(Color("TextPrimary"))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .frame(width: max(pillWidth, 0), alignment: .leading)
-                .background(Color("CardFill"))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .offset(x: xOffset + 2)
-        }
-        .frame(height: 20)
+        .padding(.bottom, 8)
     }
 }
 
