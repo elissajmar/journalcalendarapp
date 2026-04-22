@@ -16,7 +16,7 @@ class ModelData {
 
     // MARK: - Fetch
 
-    /// Fetches all blocks for a single date.
+    /// Fetches all blocks for a single date, including recurring blocks.
     func fetchBlocks(for date: Date, userId: UUID) async {
         isLoading = true
         defer { isLoading = false }
@@ -33,7 +33,52 @@ class ModelData {
                 .order("start_time")
                 .execute()
                 .value
-            blocks = await processBlockDTOs(dtos)
+
+            // Fetch recurring blocks from earlier dates
+            let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .lt("date", value: dateString)
+                .neq("recurrence", value: "never")
+                .eq("user_id", value: userIdString)
+                .order("start_time")
+                .execute()
+                .value
+
+            // Filter recurring blocks that match the selected date
+            let matchingRecurring = recurringDtos.filter { dto in
+                guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { return false }
+                let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+                let recurrenceEnd = dto.recurrenceEnd.flatMap { BlockDTO.dateFormatter.date(from: $0) }
+                return Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: date, exceptions: dto.exceptions ?? [], recurrenceEnd: recurrenceEnd)
+            }
+
+            // Combine, deduplicating by id
+            let allDtos = exactDtos + matchingRecurring
+            var seenIds = Set<UUID>()
+            let targetDateString = BlockDTO.dateFormatter.string(from: date)
+            var uniqueDtos: [BlockWithSubBlocksDTO] = []
+
+            for dto in allDtos {
+                guard seenIds.insert(dto.id).inserted else { continue }
+                // Skip if this date is in the block's exceptions list
+                if (dto.exceptions ?? []).contains(targetDateString) {
+                    continue
+                }
+                uniqueDtos.append(dto)
+            }
+
+            var fetchedBlocks = await processBlockDTOs(uniqueDtos)
+
+            // Adjust recurring blocks' times to the target date
+            fetchedBlocks = fetchedBlocks.map { block in
+                if !Calendar.current.isDate(block.startTime, inSameDayAs: date) {
+                    return Self.adjustBlockToDate(block, targetDate: date)
+                }
+                return block
+            }
+
+            blocks = fetchedBlocks
         } catch {
             print("Error fetching blocks: \(error)")
         }
@@ -80,59 +125,6 @@ class ModelData {
                                         inner.addTask {
                                             try await Task.sleep(for: .seconds(10))
                                             throw CancellationError()
-            // Fetch recurring blocks from earlier dates
-            let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
-                .from("blocks")
-                .select("*, sub_blocks(*)")
-                .lt("date", value: dateString)
-                .neq("recurrence", value: "never")
-                .eq("user_id", value: userIdString)
-                .order("start_time")
-                .execute()
-                .value
-
-            // Filter recurring blocks that match the selected date
-            let matchingRecurring = recurringDtos.filter { dto in
-                guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { return false }
-                let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
-                let recurrenceEnd = dto.recurrenceEnd.flatMap { BlockDTO.dateFormatter.date(from: $0) }
-                return Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: date, exceptions: dto.exceptions ?? [], recurrenceEnd: recurrenceEnd)
-            }
-
-            // Combine, deduplicating by id
-            let allDtos = exactDtos + matchingRecurring
-            var seenIds = Set<UUID>()
-            var fetchedBlocks: [Block] = []
-            let targetDateString = BlockDTO.dateFormatter.string(from: date)
-
-            for dto in allDtos {
-                guard seenIds.insert(dto.id).inserted else { continue }
-
-                // Skip if this date is in the block's exceptions list
-                if (dto.exceptions ?? []).contains(targetDateString) {
-                    continue
-                }
-
-                let sortedSubDTOs = dto.subBlocks.sorted { $0.sortOrder < $1.sortOrder }
-
-                var subBlocks: [SubBlock] = []
-                for subDTO in sortedSubDTOs {
-                    if subDTO.type == "images", let paths = subDTO.data.imagePaths, !paths.isEmpty {
-                        let imageData: [Data] = await withTaskGroup(of: Data?.self, returning: [Data].self) { group in
-                            for path in paths {
-                                group.addTask {
-                                    do {
-                                        return try await withThrowingTaskGroup(of: Data.self) { inner in
-                                            inner.addTask {
-                                                try await ImageStorageService.download(path: path)
-                                            }
-                                            inner.addTask {
-                                                try await Task.sleep(for: .seconds(10))
-                                                throw CancellationError()
-                                            }
-                                            let result = try await inner.next()!
-                                            inner.cancelAll()
-                                            return result
                                         }
                                         let result = try await inner.next()!
                                         inner.cancelAll()
@@ -152,14 +144,6 @@ class ModelData {
                     subBlocks.append(SubBlock(dto: subDTO, imageData: imageData))
                 } else {
                     subBlocks.append(SubBlock(dto: subDTO))
-                }
-
-                if var block = Block(dto: dto, subBlocks: subBlocks) {
-                    // Adjust recurring blocks' times to the target date
-                    if !Calendar.current.isDate(block.startTime, inSameDayAs: date) {
-                        block = Self.adjustBlockToDate(block, targetDate: date)
-                    }
-                    fetchedBlocks.append(block)
                 }
             }
             if let block = Block(dto: dto, subBlocks: subBlocks) {
