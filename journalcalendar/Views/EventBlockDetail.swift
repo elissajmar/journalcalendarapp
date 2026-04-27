@@ -10,10 +10,13 @@ import SwiftUI
 struct EventBlockDetail: View {
     @Environment(ModelData.self) var modelData
     @Environment(AuthController.self) var auth
+    @Environment(CalendarService.self) var calendarService
     @Environment(\.dismiss) var dismiss
     var blockId: UUID
     
     @State private var showDeleteAlert = false
+    @State private var inviteEmail = ""
+    @State private var isInviting = false
     
     private var block: Block? {
         modelData.blocks.first(where: { $0.id == blockId })
@@ -46,6 +49,35 @@ struct EventBlockDetail: View {
                             case .location(_, let name, let latitude, let longitude):
                                 LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
                             }
+                        }
+                        
+                        if block.isPending {
+                            HStack(spacing: 20) {
+                                Button(action: {
+                                    Task { await modelData.acceptInvitation(blockId: block.id) }
+                                }) {
+                                    Text("Accept")
+                                        .fontWeight(.bold)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.green)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
+                                
+                                Button(action: {
+                                    Task { await modelData.rejectInvitation(blockId: block.id) }
+                                }) {
+                                    Text("Reject")
+                                        .fontWeight(.bold)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.red)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
+                            }
+                            .padding(.top, 24) // Add some spacing from the content above
                         }
                     }
                     .padding()
@@ -113,7 +145,9 @@ struct EventBlockDetail: View {
                     }
             }
         }
+        
     }
+    
     
     // MARK: - Helpers
     
@@ -129,14 +163,22 @@ struct EventBlockDetail: View {
     }
 }
 
+
 #Preview {
     @Previewable @State var showSheet = true
-    let modelData = ModelData.preview()
     
-    return Color.clear
+    // 1. Initialize your dependencies
+    let modelData = ModelData.preview()
+    let authController = AuthController()
+    let calendarService = CalendarService()
+    
+    // 2. Simply list the view (no 'return' keyword)
+    Color.clear
         .sheet(isPresented: $showSheet) {
             EventBlockDetail(blockId: ModelData.sampleBlock.id)
                 .environment(modelData)
+                .environment(authController)
+                .environment(calendarService)
         }
         .onAppear {
             showSheet = true

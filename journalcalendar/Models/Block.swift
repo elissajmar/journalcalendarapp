@@ -14,6 +14,7 @@ struct Block: Identifiable {
     var endTime: Date
     var title: String
     var subBlocks: [SubBlock]
+    var isPending: Bool = false
 
     init(
         id: UUID = UUID(),

@@ -190,4 +190,5 @@ struct HomeView: View {
 #Preview {
     HomeView()
         .environment(ModelData.preview())
+        .environment(AuthController())
 }

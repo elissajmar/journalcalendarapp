@@ -19,9 +19,10 @@ struct BlockDTO: Codable {
     let date: String        // yyyy-MM-dd
     let startTime: String   // ISO8601 timestamptz
     let endTime: String     // ISO8601 timestamptz
-
+    let status: String?
+    
     enum CodingKeys: String, CodingKey {
-        case id, title, date
+        case id, title, date, status
         case userId = "user_id"
         case startTime = "start_time"
         case endTime = "end_time"
@@ -72,10 +73,11 @@ struct BlockWithSubBlocksDTO: Codable {
     let date: String
     let startTime: String
     let endTime: String
+    let status: String?
     let subBlocks: [SubBlockDTO]
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date
+        case id, title, date, status
         case userId = "user_id"
         case startTime = "start_time"
         case endTime = "end_time"
@@ -128,7 +130,8 @@ extension Block {
             title: title,
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
-            endTime: BlockDTO.iso8601Formatter.string(from: endTime)
+            endTime: BlockDTO.iso8601Formatter.string(from: endTime),
+            status: "accepted"
         )
     }
 

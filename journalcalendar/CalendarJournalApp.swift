@@ -12,6 +12,7 @@ import Supabase
 struct CalendarJournalApp: App {
     @State private var authController = AuthController()
     @State private var modelData = ModelData()
+    @State var calendarService = CalendarService()
 
     var body: some Scene {
         WindowGroup {
@@ -25,6 +26,7 @@ struct CalendarJournalApp: App {
                     ContentView()
                         .environment(modelData)
                         .environment(authController)
+                        .environment(calendarService)
                 } else {
                     LoginView()
                         .environment(authController)
