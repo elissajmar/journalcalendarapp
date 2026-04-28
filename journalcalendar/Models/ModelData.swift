@@ -68,6 +68,13 @@ class ModelData {
                 uniqueDtos.append(dto)
             }
 
+            print("DEBUG: userId=\(userIdString), date=\(dateString)")
+            print("DEBUG: exactDtos count=\(exactDtos.count)")
+            print("DEBUG: recurringDtos count=\(recurringDtos.count)")
+            for dto in exactDtos {
+                print("DEBUG: exact dto id=\(dto.id) title=\(dto.title) date=\(dto.date) start=\(dto.startTime)")
+            }
+
             var fetchedBlocks = await processBlockDTOs(uniqueDtos)
 
             // Adjust recurring blocks' times to the target date
@@ -78,30 +85,207 @@ class ModelData {
                 return block
             }
 
+            print("DEBUG: fetchedBlocks count=\(fetchedBlocks.count)")
             blocks = fetchedBlocks
         } catch {
-            print("Error fetching blocks: \(error)")
+            print("DEBUG ERROR fetching blocks: \(error)")
         }
     }
 
-    /// Fetches all blocks across multiple dates (e.g. for the 3-day view).
+    /// Fetches all blocks across multiple dates (e.g. for the 3-day and monthly views),
+    /// including recurring blocks that fall on those dates.
     func fetchBlocks(for dates: [Date], userId: UUID) async {
         guard !dates.isEmpty else { blocks = []; return }
         isLoading = true
         defer { isLoading = false }
         do {
             let dateStrings = dates.map { BlockDTO.dateFormatter.string(from: $0) }
-            let dtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+            let userIdString = userId.uuidString.lowercased()
+
+            print("DEBUG multi-date: fetching \(dateStrings.count) dates, userId=\(userIdString)")
+
+            // Fetch blocks with exact date matches
+            let exactDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
                 .select("*, sub_blocks(*)")
                 .in("date", value: dateStrings)
-                .eq("user_id", value: userId.uuidString.lowercased())
+                .eq("user_id", value: userIdString)
                 .order("start_time")
                 .execute()
                 .value
-            blocks = await processBlockDTOs(dtos)
+
+            print("DEBUG multi-date: exactDtos=\(exactDtos.count)")
+
+            // Fetch recurring blocks from before the date range
+            guard let earliestDate = dates.min() else { blocks = []; return }
+            let earliestDateString = BlockDTO.dateFormatter.string(from: earliestDate)
+
+            let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .lt("date", value: earliestDateString)
+                .neq("recurrence", value: "never")
+                .eq("user_id", value: userIdString)
+                .order("start_time")
+                .execute()
+                .value
+
+            print("DEBUG multi-date: recurringDtos=\(recurringDtos.count), earliestDate=\(earliestDateString)")
+            for dto in recurringDtos {
+                print("DEBUG recurring: id=\(dto.id) title=\(dto.title) recurrence=\(dto.recurrence ?? "nil") date=\(dto.date)")
+            }
+
+            // Combine all recurring DTOs: from before the range AND within the range
+            let allRecurring = recurringDtos + exactDtos.filter {
+                let rec = Recurrence(rawValue: $0.recurrence ?? "never") ?? .never
+                return rec != .never
+            }
+
+            // For each recurring block, find which target dates it matches
+            var expandedDtos: [(dto: BlockWithSubBlocksDTO, targetDate: Date)] = []
+
+            // Add non-recurring exact matches with their own date
+            for dto in exactDtos {
+                let rec = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+                if rec == .never, let date = BlockDTO.dateFormatter.date(from: dto.date) {
+                    expandedDtos.append((dto, date))
+                }
+            }
+
+            // Expand all recurring blocks across matching dates
+            var seenRecurringIds = Set<UUID>()
+            for dto in allRecurring {
+                guard seenRecurringIds.insert(dto.id).inserted else { continue }
+                guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { continue }
+                let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+                let recurrenceEnd = dto.recurrenceEnd.flatMap { BlockDTO.dateFormatter.date(from: $0) }
+
+                for targetDate in dates {
+                    // Include the origin date itself, plus any recurrence matches
+                    let isOrigin = Calendar.current.isDate(originDate, inSameDayAs: targetDate)
+                    let isRecurrenceMatch = Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: targetDate, exceptions: dto.exceptions ?? [], recurrenceEnd: recurrenceEnd)
+                    if isOrigin || isRecurrenceMatch {
+                        expandedDtos.append((dto, targetDate))
+                    }
+                }
+            }
+
+            // Process unique DTOs for sub-block hydration
+            var seenIds = Set<UUID>()
+            var uniqueDtos: [BlockWithSubBlocksDTO] = []
+            for (dto, _) in expandedDtos {
+                if seenIds.insert(dto.id).inserted {
+                    uniqueDtos.append(dto)
+                }
+            }
+            let hydratedBlocks = await processBlockDTOs(uniqueDtos)
+            let blockById = Dictionary(uniqueKeysWithValues: hydratedBlocks.map { ($0.id, $0) })
+
+            // Build final list with date-adjusted copies for recurring blocks
+            var fetchedBlocks: [Block] = []
+            var seenPairs = Set<String>()
+            for (dto, targetDate) in expandedDtos {
+                let pairKey = "\(dto.id)-\(BlockDTO.dateFormatter.string(from: targetDate))"
+                guard seenPairs.insert(pairKey).inserted else { continue }
+                guard var block = blockById[dto.id] else { continue }
+                if !Calendar.current.isDate(block.startTime, inSameDayAs: targetDate) {
+                    block = Self.adjustBlockToDate(block, targetDate: targetDate)
+                }
+                fetchedBlocks.append(block)
+            }
+
+            blocks = fetchedBlocks
         } catch {
             print("Error fetching blocks for multiple dates: \(error)")
+        }
+    }
+
+    /// Fetches blocks for a set of dates and returns them without modifying `self.blocks`.
+    /// Used by the monthly view to load months independently.
+    func fetchBlocksWithoutStoring(for dates: [Date], userId: UUID) async -> [Block] {
+        guard !dates.isEmpty else { return [] }
+        do {
+            let dateStrings = dates.map { BlockDTO.dateFormatter.string(from: $0) }
+            let userIdString = userId.uuidString.lowercased()
+
+            let exactDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .in("date", value: dateStrings)
+                .eq("user_id", value: userIdString)
+                .order("start_time")
+                .execute()
+                .value
+
+            guard let earliestDate = dates.min() else { return [] }
+            let earliestDateString = BlockDTO.dateFormatter.string(from: earliestDate)
+
+            let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
+                .from("blocks")
+                .select("*, sub_blocks(*)")
+                .lt("date", value: earliestDateString)
+                .neq("recurrence", value: "never")
+                .eq("user_id", value: userIdString)
+                .order("start_time")
+                .execute()
+                .value
+
+            let allRecurring = recurringDtos + exactDtos.filter {
+                let rec = Recurrence(rawValue: $0.recurrence ?? "never") ?? .never
+                return rec != .never
+            }
+
+            var expandedDtos: [(dto: BlockWithSubBlocksDTO, targetDate: Date)] = []
+
+            for dto in exactDtos {
+                let rec = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+                if rec == .never, let date = BlockDTO.dateFormatter.date(from: dto.date) {
+                    expandedDtos.append((dto, date))
+                }
+            }
+
+            var seenRecurringIds = Set<UUID>()
+            for dto in allRecurring {
+                guard seenRecurringIds.insert(dto.id).inserted else { continue }
+                guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { continue }
+                let recurrence = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
+                let recurrenceEnd = dto.recurrenceEnd.flatMap { BlockDTO.dateFormatter.date(from: $0) }
+
+                for targetDate in dates {
+                    let isOrigin = Calendar.current.isDate(originDate, inSameDayAs: targetDate)
+                    let isRecurrenceMatch = Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: targetDate, exceptions: dto.exceptions ?? [], recurrenceEnd: recurrenceEnd)
+                    if isOrigin || isRecurrenceMatch {
+                        expandedDtos.append((dto, targetDate))
+                    }
+                }
+            }
+
+            var seenIds = Set<UUID>()
+            var uniqueDtos: [BlockWithSubBlocksDTO] = []
+            for (dto, _) in expandedDtos {
+                if seenIds.insert(dto.id).inserted {
+                    uniqueDtos.append(dto)
+                }
+            }
+            let hydratedBlocks = await processBlockDTOs(uniqueDtos)
+            let blockById = Dictionary(uniqueKeysWithValues: hydratedBlocks.map { ($0.id, $0) })
+
+            var fetchedBlocks: [Block] = []
+            var seenPairs = Set<String>()
+            for (dto, targetDate) in expandedDtos {
+                let pairKey = "\(dto.id)-\(BlockDTO.dateFormatter.string(from: targetDate))"
+                guard seenPairs.insert(pairKey).inserted else { continue }
+                guard var block = blockById[dto.id] else { continue }
+                if !Calendar.current.isDate(block.startTime, inSameDayAs: targetDate) {
+                    block = Self.adjustBlockToDate(block, targetDate: targetDate)
+                }
+                fetchedBlocks.append(block)
+            }
+
+            return fetchedBlocks
+        } catch {
+            print("Error fetching blocks for month: \(error)")
+            return []
         }
     }
 

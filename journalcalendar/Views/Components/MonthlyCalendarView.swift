@@ -16,6 +16,9 @@ struct MonthlyCalendarView: View {
 
     @State private var displayedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var showAddBlock = false
+    @State private var visibleMonths: Set<String> = []
+    @State private var blocksByMonth: [String: [Block]] = [:]
+    @State private var loadedMonths: Set<String> = []
 
     private let calendar = Calendar.current
     private let dayOfWeekHeaders = ["S", "M", "T", "W", "T", "F", "S"]
@@ -49,14 +52,20 @@ struct MonthlyCalendarView: View {
                     ScrollView {
                         LazyVStack(spacing: 0, pinnedViews: []) {
                             ForEach(months, id: \.self) { month in
+                                let key = monthId(month)
                                 MonthSection(
                                     month: month,
-                                    blocks: modelData.blocks,
+                                    blocks: blocksByMonth[key] ?? [],
                                     onDateSelected: onDateSelected
                                 )
-                                .id(monthId(month))
+                                .id(key)
                                 .onAppear {
                                     updateYear(for: month)
+                                    visibleMonths.insert(key)
+                                    loadMonthIfNeeded(month)
+                                }
+                                .onDisappear {
+                                    visibleMonths.remove(key)
                                 }
                             }
                         }
@@ -95,10 +104,10 @@ struct MonthlyCalendarView: View {
             }
         }
         .background(Color("BG"))
-        .task {
-            guard let userId = auth.currentUserId else { return }
-            let range = dateRange
-            await modelData.fetchBlocks(from: range.start, to: range.end, userId: userId)
+        .onAppear {
+            // Clear caches so data is re-fetched for visible months
+            loadedMonths.removeAll()
+            blocksByMonth.removeAll()
         }
         .sheet(isPresented: $showAddBlock) {
             AddEventBlock(initialDate: Date())
@@ -153,7 +162,7 @@ struct MonthlyCalendarView: View {
 
     private var dayOfWeekRow: some View {
         HStack(spacing: 0) {
-            ForEach(dayOfWeekHeaders, id: \.self) { day in
+            ForEach(Array(dayOfWeekHeaders.enumerated()), id: \.offset) { _, day in
                 Text(day)
                     .font(.label)
                     .foregroundStyle(Color("TextSecondary"))
@@ -168,6 +177,28 @@ struct MonthlyCalendarView: View {
     private func monthId(_ month: Date) -> String {
         let comps = calendar.dateComponents([.year, .month], from: month)
         return "\(comps.year!)-\(comps.month!)"
+    }
+
+    private func datesInMonth(_ month: Date) -> [Date] {
+        guard let range = calendar.range(of: .day, in: .month, for: month) else { return [] }
+        var comps = calendar.dateComponents([.year, .month], from: month)
+        return range.compactMap { day in
+            comps.day = day
+            return calendar.date(from: comps)
+        }
+    }
+
+    private func loadMonthIfNeeded(_ month: Date) {
+        let key = monthId(month)
+        guard !loadedMonths.contains(key) else { return }
+        loadedMonths.insert(key)
+
+        Task {
+            guard let userId = auth.currentUserId else { return }
+            let dates = datesInMonth(month)
+            let blocks = await modelData.fetchBlocksWithoutStoring(for: dates, userId: userId)
+            blocksByMonth[key] = blocks
+        }
     }
 
     private func updateYear(for month: Date) {
