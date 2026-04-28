@@ -24,11 +24,6 @@ class ModelData {
             let dateString = BlockDTO.dateFormatter.string(from: date)
             let userIdString = userId.uuidString.lowercased()
 
-            // Fetches events you own OR events where you are an invitee and haven't rejected
-            let dtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
-                .from("blocks")
-                .select("*, sub_blocks(*)")
-                .eq("date", value: dateString)
             // Fetch blocks for the exact date
             let exactDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
@@ -188,39 +183,6 @@ class ModelData {
 
             // Build final list with date-adjusted copies for recurring blocks
             var fetchedBlocks: [Block] = []
-            var seenIds = Set<UUID>() // Prevents visual duplicates from overlapping RLS policies
-
-            for dto in dtos {
-                // 1. Skip if we've already processed this specific ID in this loop
-                guard !seenIds.contains(dto.id) else { continue }
-                seenIds.insert(dto.id)
-                
-                let sortedSubDTOs = dto.subBlocks.sorted { $0.sortOrder < $1.sortOrder }
-                var subBlocks: [SubBlock] = []
-
-                for subDTO in sortedSubDTOs {
-                    if subDTO.type == "images", let paths = subDTO.data.imagePaths, !paths.isEmpty {
-                        // Download images with a timeout
-                        let imageData: [Data] = await withTaskGroup(of: Data?.self, returning: [Data].self) { group in
-                            for path in paths {
-                                group.addTask {
-                                    do {
-                                        return try await withThrowingTaskGroup(of: Data.self) { inner in
-                                            inner.addTask { try await ImageStorageService.download(path: path) }
-                                            inner.addTask {
-                                                try await Task.sleep(for: .seconds(10))
-                                                throw CancellationError()
-                                            }
-                                            let result = try await inner.next()!
-                                            inner.cancelAll()
-                                            return result
-                                        }
-                                    } catch { return nil }
-                                }
-                            }
-                            var results: [Data] = []
-                            for await data in group { if let data { results.append(data) } }
-                            return results
             var seenPairs = Set<String>()
             for (dto, targetDate) in expandedDtos {
                 let pairKey = "\(dto.id)-\(BlockDTO.dateFormatter.string(from: targetDate))"
@@ -367,17 +329,6 @@ class ModelData {
                 } else {
                     subBlocks.append(SubBlock(dto: subDTO))
                 }
-
-                // 2. Initialize the block exactly ONCE
-                if var block = Block(dto: dto, subBlocks: subBlocks) {
-                    // 3. Mark as pending if you are an invitee and haven't accepted yet
-                    if dto.userId != userId && dto.status != "accepted" {
-                        block.isPending = true
-                    }
-                    
-                    fetchedBlocks.append(block)
-//                    seenIds.insert(dto.id)
-                }
             }
             if let block = Block(dto: dto, subBlocks: subBlocks) {
                 fetchedBlocks.append(block)
@@ -386,11 +337,6 @@ class ModelData {
         return fetchedBlocks
     }
 
-            // 4. Replace the entire array on the main thread
-            self.blocks = fetchedBlocks
-            
-        } catch {
-            print("Error fetching blocks: \(error)")
     // MARK: - Recurrence Matching
 
     /// Checks whether a block with the given recurrence and origin date
@@ -454,14 +400,12 @@ class ModelData {
             recurrenceEnd: block.recurrenceEnd
         )
     }
-    
+
     // MARK: - Create
 
-    /// Creates a new block in Supabase, uploads any images, and adds to the local array.
-    func createBlock(title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock], userId: UUID) async -> UUID? {
     /// Creates a new block in Supabase, uploads any images, and
     /// adds the block to the local array.
-    func createBlock(title: String, startTime: Date, endTime: Date, recurrence: Recurrence = .never, subBlocks: [SubBlock], userId: UUID) async {
+    func createBlock(title: String, startTime: Date, endTime: Date, recurrence: Recurrence = .never, subBlocks: [SubBlock], userId: UUID) async -> UUID? {
         let calendar = Calendar.current
         let date = calendar.startOfDay(for: startTime)
         let blockId = UUID()
@@ -473,7 +417,7 @@ class ModelData {
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
             endTime: BlockDTO.iso8601Formatter.string(from: endTime),
-            status: "accepted"
+            status: "accepted",
             recurrence: recurrence.rawValue,
             exceptions: nil,
             recurrenceEnd: nil
@@ -494,8 +438,6 @@ class ModelData {
                 try await AppSupabase.client.from("sub_blocks").insert(dto).execute()
             }
 
-            let newBlock = Block(id: blockId, date: date, startTime: startTime, endTime: endTime, title: title, subBlocks: subBlocks)
-            // Add to local array so the UI updates immediately
             let newBlock = Block(
                 id: blockId, date: date, startTime: startTime,
                 endTime: endTime, title: title, recurrence: recurrence, subBlocks: subBlocks
@@ -507,7 +449,7 @@ class ModelData {
             return nil
         }
     }
-    
+
     // MARK: - Invitation Actions
 
     /// Inserts a new invitation record into the event_invitees table
@@ -523,7 +465,7 @@ class ModelData {
                 .from("event_invitees")
                 .insert(invite)
                 .execute()
-            
+
             print("DEBUG: Insert status code: \(response.status)")
         } catch {
             print("DEBUG: Detailed error: \(error)")
@@ -538,7 +480,7 @@ class ModelData {
                 .update(["status": "accepted"])
                 .eq("id", value: blockId.uuidString)
                 .execute()
-            
+
             if let index = blocks.firstIndex(where: { $0.id == blockId }) {
                 blocks[index].isPending = false
             }
@@ -555,7 +497,7 @@ class ModelData {
                 .update(["status": "rejected"])
                 .eq("id", value: blockId.uuidString)
                 .execute()
-            
+
             blocks.removeAll { $0.id == blockId }
         } catch {
             print("Error rejecting invitation: \(error)")
@@ -564,8 +506,6 @@ class ModelData {
 
     // MARK: - Update
 
-    /// Updates an existing block in Supabase and replaces all sub-blocks.
-    func updateBlock(id: UUID, title: String, startTime: Date, endTime: Date, subBlocks: [SubBlock], userId: UUID) async {
     /// Updates an existing block in Supabase. Replaces all sub-blocks
     /// (deletes old ones, inserts new ones).
     func updateBlock(id: UUID, title: String, startTime: Date, endTime: Date, recurrence: Recurrence = .never, subBlocks: [SubBlock], userId: UUID) async {
@@ -579,7 +519,7 @@ class ModelData {
             date: BlockDTO.dateFormatter.string(from: date),
             startTime: BlockDTO.iso8601Formatter.string(from: startTime),
             endTime: BlockDTO.iso8601Formatter.string(from: endTime),
-            status: "accepted"
+            status: "accepted",
             recurrence: recurrence.rawValue,
             exceptions: nil,
             recurrenceEnd: nil
@@ -635,7 +575,6 @@ class ModelData {
 
     // MARK: - Delete
 
-    /// Deletes a block and cleans up associated images.
     /// Helper structs for partial Supabase updates.
     private struct ExceptionsUpdate: Codable {
         let exceptions: [String]
@@ -746,13 +685,6 @@ class ModelData {
         }
     }
 
-//    // MARK: - Sample Data
-//    static func preview() -> ModelData {
-//        let data = ModelData()
-//        // ... (keep your existing sampleBlock additions)
-//        return data
-//    }
-    
     // MARK: - Sample Data (for previews only)
 
     static var sampleBlock: Block {
