@@ -22,7 +22,7 @@ struct LinkSubBlockEdit: View {
                 HStack {
                     Image(systemName: "link")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color("TextSecondary"))
                     
                     Text("LINK")
                         .labelStyle()
@@ -36,7 +36,7 @@ struct LinkSubBlockEdit: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                 }
             }
@@ -49,7 +49,7 @@ struct LinkSubBlockEdit: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding(12)
-                    .background(Color(uiColor: .secondarySystemBackground))
+                    .background(Color("SecondaryButtonFill"))
                     .cornerRadius(8)
             }
         }

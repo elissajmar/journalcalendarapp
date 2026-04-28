@@ -17,8 +17,10 @@ struct EventBlockDetailEdit: View {
     @State private var title: String = ""
     @State private var startTime: Date = Date()
     @State private var endTime: Date = Date()
+    @State private var recurrence: Recurrence = .never
     @State private var subBlocks: [SubBlock] = []
     @State private var showDeleteAlert: Bool = false
+    @State private var showRecurringDeleteDialog: Bool = false
     
     private var block: Block? {
         modelData.blocks.first(where: { $0.id == blockId })
@@ -45,6 +47,18 @@ struct EventBlockDetailEdit: View {
                             .datePickerStyle(.compact)
                             .labelsHidden()
                     }
+
+                    Picker(selection: $recurrence) {
+                        ForEach(Recurrence.allCases) { option in
+                            Text(option.displayName).tag(option)
+                        }
+                    } label: {
+                        Text(recurrence.displayName)
+                    }
+                    .pickerStyle(.menu)
+                    .font(.label)
+                    .textCase(.uppercase)
+                    .tint(.primary)
                 }
                 
                 SubBlockEditor(subBlocks: $subBlocks)
@@ -61,6 +75,20 @@ struct EventBlockDetailEdit: View {
         } message: {
             Text("Are you sure you want to delete this event? This action cannot be undone.")
         }
+        .confirmationDialog("Delete Recurring Event", isPresented: $showRecurringDeleteDialog, titleVisibility: .visible) {
+            Button("Delete This Event", role: .destructive) {
+                deleteThisInstance()
+            }
+            Button("Delete This and All Future Events", role: .destructive) {
+                deleteThisAndFuture()
+            }
+            Button("Delete All Events", role: .destructive) {
+                deleteBlock()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This is a recurring event.")
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
@@ -68,18 +96,22 @@ struct EventBlockDetailEdit: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.body)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color("TextPrimary"))
                 }
             }
             
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     Button {
-                        showDeleteAlert = true
+                        if let block = block, block.recurrence != .never {
+                            showRecurringDeleteDialog = true
+                        } else {
+                            showDeleteAlert = true
+                        }
                     } label: {
                         Image(systemName: "trash")
                             .font(.body)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                     
                     Button {
@@ -93,8 +125,8 @@ struct EventBlockDetailEdit: View {
                         .textCase(.uppercase)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color(uiColor: .secondarySystemBackground))
-                        .foregroundStyle(.primary)
+                        .background(Color("SecondaryButtonFill"))
+                        .foregroundStyle(Color("TextPrimary"))
                         .cornerRadius(8)
                     }
                 }
@@ -112,6 +144,7 @@ struct EventBlockDetailEdit: View {
         title = block.title
         startTime = block.startTime
         endTime = block.endTime
+        recurrence = block.recurrence
         subBlocks = block.subBlocks
     }
     
@@ -123,6 +156,7 @@ struct EventBlockDetailEdit: View {
                 title: title,
                 startTime: startTime,
                 endTime: endTime,
+                recurrence: recurrence,
                 subBlocks: subBlocks,
                 userId: userId
             )
@@ -133,6 +167,28 @@ struct EventBlockDetailEdit: View {
     private func deleteBlock() {
         Task {
             await modelData.deleteBlock(id: blockId)
+        }
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            dismiss()
+        }
+    }
+
+    private func deleteThisInstance() {
+        guard let block = block else { return }
+        Task {
+            await modelData.deleteBlockInstance(id: blockId, date: block.date)
+        }
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            dismiss()
+        }
+    }
+
+    private func deleteThisAndFuture() {
+        guard let block = block else { return }
+        Task {
+            await modelData.deleteBlockAndFuture(id: blockId, fromDate: block.date)
         }
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

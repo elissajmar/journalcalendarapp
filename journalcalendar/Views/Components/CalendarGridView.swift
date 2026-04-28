@@ -10,6 +10,8 @@ import SwiftUI
 struct CalendarGridView: View {
     var blocks: [Block]
     @Binding var hourHeight: CGFloat
+    var selectedDate: Date
+    var slideTransition: AnyTransition
     var onBlockTapped: (Block) -> Void
     var onBlockDragFinished: (Block, CGFloat) -> Void
     
@@ -19,18 +21,13 @@ struct CalendarGridView: View {
     @State private var draggingBlockId: UUID? = nil
     @State private var dragOffset: CGFloat = 0
 
-    
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // Background grid with fixed heights
+            // Layer 1: Hour divider lines (full width, no labels)
             VStack(spacing: 0) {
                 ForEach(hours, id: \.self) { hour in
                     HStack(alignment: .top, spacing: 0) {
-                        Text(DateFormatters.hourLabel(for: hour))
-                            .labelStyle()
-                            .frame(width: 60, alignment: .trailing)
-                            .padding(.trailing, 12)
-                        
+                        Spacer().frame(width: 72)
                         VStack {
                             Divider()
                                 .padding(.trailing, 16)
@@ -43,7 +40,7 @@ struct CalendarGridView: View {
                 }
             }
             
-            // Snap time indicator shown during drag
+            // Layer 2: Snap time indicator shown during drag
             if let dragBlock = draggingBlock {
                 let snappedY = drag.snappedDropY(for: dragBlock, dragOffset: dragOffset, baseYOffset: layout.yOffset(for: dragBlock)) + 8
                 Text(drag.snappedTimeLabel(for: dragBlock, dragOffset: dragOffset))
@@ -55,7 +52,7 @@ struct CalendarGridView: View {
                     .offset(y: snappedY - 2)
             }
             
-            // Event blocks overlaid on top
+            // Layer 3: Event blocks — slides on day change
             HStack(spacing: 0) {
                 Spacer()
                     .frame(width: 72)
@@ -68,7 +65,7 @@ struct CalendarGridView: View {
                                 let baseY = layout.yOffset(for: position.block) + 8
                                 
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemBackground))
+                                    .fill(Color("CardFill"))
                                     .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
                                     .opacity(0.5)
                                     .frame(width: geometry.size.width / CGFloat(position.totalColumns))
@@ -130,6 +127,22 @@ struct CalendarGridView: View {
                 Spacer()
                     .frame(width: 16)
             }
+            .id(selectedDate)
+            .transition(slideTransition)
+            
+            // Layer 4: Time labels with opaque background — always above event blocks
+            VStack(spacing: 0) {
+                ForEach(hours, id: \.self) { hour in
+                    Text(DateFormatters.hourLabel(for: hour))
+                        .labelStyle()
+                        .frame(width: 60, alignment: .trailing)
+                        .padding(.trailing, 12)
+                        .frame(height: hourHeight, alignment: .top)
+                }
+            }
+            .frame(width: 72)
+            .background(Color("BG"))
+            .allowsHitTesting(false)
         }
         .padding(.vertical)
         .coordinateSpace(name: "calendarGrid")

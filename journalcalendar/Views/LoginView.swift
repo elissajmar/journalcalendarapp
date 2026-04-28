@@ -33,7 +33,7 @@ struct LoginView: View {
             // Section label
             Text(mode == .signUp ? "CREATE AN ACCOUNT" : "SIGN IN")
                 .font(.label)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color("TextSecondary"))
                 .padding(.bottom, 24)
             
             // Email, password, and create account button (8px gaps)
@@ -47,7 +47,7 @@ struct LoginView: View {
                     .multilineTextAlignment(.center)
                     .padding(.vertical, 18)
                     .padding(.horizontal, 20)
-                    .background(.white)
+                    .background(Color("CardFill"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 
                 SecureField("Password", text: $password)
@@ -58,7 +58,7 @@ struct LoginView: View {
                     .multilineTextAlignment(.center)
                     .padding(.vertical, 18)
                     .padding(.horizontal, 20)
-                    .background(.white)
+                    .background(Color("CardFill"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 
                 // Error message
@@ -84,7 +84,7 @@ struct LoginView: View {
                     HStack(spacing: 8) {
                         if isLoading {
                             ProgressView()
-                                .tint(.white)
+                                .tint(Color("TextPrimaryLight"))
                         }
                         Text(mode == .signUp ? "Create account" : "Sign in")
                     }
@@ -92,8 +92,8 @@ struct LoginView: View {
                     .textCase(.uppercase)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
-                    .background(Color(hex: "7A6559"))
-                    .foregroundStyle(.white)
+                    .background(Color("ButtonPrimary"))
+                    .foregroundStyle(Color("TextPrimaryLight"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .disabled(email.isEmpty || password.isEmpty || isLoading)
@@ -104,13 +104,13 @@ struct LoginView: View {
             // OR divider
             HStack(spacing: 12) {
                 Rectangle()
-                    .fill(Color.secondary.opacity(0.3))
+                    .fill(Color("Stroke"))
                     .frame(height: 1)
                 Text("OR")
                     .font(.label)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
                 Rectangle()
-                    .fill(Color.secondary.opacity(0.3))
+                    .fill(Color("Stroke"))
                     .frame(height: 1)
             }
             .padding(.horizontal, 24)
@@ -135,12 +135,12 @@ struct LoginView: View {
             } label: {
                 Text(mode == .signUp ? "SIGN IN TO EXISTING ACCOUNT" : "CREATE AN ACCOUNT")
                     .font(.label)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
                     .underline()
             }
             .padding(.bottom, 40)
         }
-        .background(Color("AppBackground"))
+        .background(Color("BG"))
     }
     
     // MARK: - Components
@@ -152,14 +152,14 @@ struct LoginView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
                 Text(label)
                     .font(.paragraph1)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color("TextPrimary"))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(.white)
+            .background(Color("CardFill"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
     }

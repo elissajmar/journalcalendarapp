@@ -20,6 +20,7 @@ struct AddEventBlock: View {
     @State private var title: String = ""
     @State private var startTime: Date
     @State private var endTime: Date
+    @State private var recurrence: Recurrence = .never
     @State private var subBlocks: [SubBlock] = []
     
     @State private var inviteeEmail: String = ""
@@ -49,7 +50,7 @@ struct AddEventBlock: View {
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("Add title", text: $title)
                             .font(.heading3)
-                            .foregroundStyle(title.isEmpty ? .secondary : .primary)
+                            .foregroundStyle(title.isEmpty ? Color("TextSecondary") : Color("TextPrimary"))
                             .textFieldStyle(.plain)
                         
                         HStack(spacing: 12) {
@@ -64,6 +65,18 @@ struct AddEventBlock: View {
                                 .datePickerStyle(.compact)
                                 .labelsHidden()
                         }
+
+                        Picker(selection: $recurrence) {
+                            ForEach(Recurrence.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        } label: {
+                            Text(recurrence.displayName)
+                        }
+                        .pickerStyle(.menu)
+                        .font(.label)
+                        .textCase(.uppercase)
+                        .tint(.primary)
                     }
 //                    VStack(alignment: .leading, spacing: 12) {
 //                        Text("Invite a Friend")
@@ -102,7 +115,7 @@ struct AddEventBlock: View {
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.body)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color("TextPrimary"))
                     }
                     .buttonStyle(.plain)
                 }
@@ -114,7 +127,7 @@ struct AddEventBlock: View {
                         } label: {
                             Image(systemName: "trash")
                                 .font(.body)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color("TextSecondary"))
                         }
                         .buttonStyle(.plain)
                         
@@ -153,6 +166,7 @@ struct AddEventBlock: View {
                 title: title,
                 startTime: startTime,
                 endTime: endTime,
+                recurrence: recurrence,
                 subBlocks: subBlocks,
                 userId: userId
             )

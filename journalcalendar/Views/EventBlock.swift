@@ -91,6 +91,7 @@ struct EventBlock: View {
                     .stroke(Color.brown, style: StrokeStyle(lineWidth: 2, dash: [6, 3]))
             }
         }
+        .background(Color("CardFill"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
         .padding(.trailing, 4)
