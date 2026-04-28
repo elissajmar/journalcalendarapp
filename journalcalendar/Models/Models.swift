@@ -47,8 +47,8 @@ struct EventInvitee: Codable {
     }
 }
 
-struct EventInviteeDTO: Encodable {
-    let event_id: UUID
-    let invitee_email: String
-    let status: String
-}
+//struct EventInviteeDTO: Encodable {
+//    let event_id: UUID
+//    let invitee_email: String
+//    let status: String
+//}
