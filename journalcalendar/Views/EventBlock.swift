@@ -38,6 +38,7 @@ struct EventBlock: View {
                         .fontWeight(.medium)
                         .lineLimit(height < 60 ? 1 : 2)
                         .truncationMode(.tail)
+                        .foregroundStyle(block.isPending ? .secondary : .primary)
                     
                     if height >= 50 {
                         Text(timeRangeString)
@@ -78,10 +79,24 @@ struct EventBlock: View {
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        
+//        .background(Color(.systemBackground))
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(block.isPending ? Color(.systemBackground).opacity(0.6) : Color(.systemBackground))
+        )
+        .overlay {
+            if block.isPending {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.brown, style: StrokeStyle(lineWidth: 2, dash: [6, 3]))
+            }
+        }
         .background(Color("CardFill"))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
         .padding(.trailing, 4)
+        
+        
     }
     
     // MARK: - Helpers
