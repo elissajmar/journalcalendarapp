@@ -35,6 +35,7 @@ struct Block: Identifiable {
     var title: String
     var recurrence: Recurrence
     var subBlocks: [SubBlock]
+    var isPending: Bool = false
     var originalDate: Date
     var exceptions: [String]
     var recurrenceEnd: Date?

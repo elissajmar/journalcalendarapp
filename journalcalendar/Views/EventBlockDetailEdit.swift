@@ -39,10 +39,13 @@ struct EventBlockDetailEdit: View {
                         DatePicker("", selection: $startTime, displayedComponents: [.date, .hourAndMinute])
                             .datePickerStyle(.compact)
                             .labelsHidden()
-                        
+                            .onChange(of: startTime) { _, newStart in
+                                endTime = Self.syncDate(of: newStart, withTimeOf: endTime)
+                            }
+
                         Text("to")
                             .labelStyle()
-                        
+
                         DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
                             .datePickerStyle(.compact)
                             .labelsHidden()
@@ -96,7 +99,7 @@ struct EventBlockDetailEdit: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.body)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color("TextPrimary"))
                 }
             }
             
@@ -111,7 +114,7 @@ struct EventBlockDetailEdit: View {
                     } label: {
                         Image(systemName: "trash")
                             .font(.body)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                     
                     Button {
@@ -125,8 +128,8 @@ struct EventBlockDetailEdit: View {
                         .textCase(.uppercase)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color(uiColor: .secondarySystemBackground))
-                        .foregroundStyle(.primary)
+                        .background(Color("SecondaryButtonFill"))
+                        .foregroundStyle(Color("TextPrimary"))
                         .cornerRadius(8)
                     }
                 }
@@ -143,9 +146,22 @@ struct EventBlockDetailEdit: View {
         guard let block = block else { return }
         title = block.title
         startTime = block.startTime
-        endTime = block.endTime
+        // The end-time DatePicker only edits hour/minute and preserves
+        // the bound value's date. If the saved end was rolled to the
+        // next day (e.g. an 11 PM → midnight event), we'd otherwise
+        // carry that date forward when the user edits the time.
+        endTime = Self.syncDate(of: block.startTime, withTimeOf: block.endTime)
         recurrence = block.recurrence
         subBlocks = block.subBlocks
+    }
+
+    private static func syncDate(of dateSource: Date, withTimeOf timeSource: Date) -> Date {
+        let cal = Calendar.current
+        let timeComps = cal.dateComponents([.hour, .minute, .second], from: timeSource)
+        return cal.date(bySettingHour: timeComps.hour ?? 0,
+                        minute: timeComps.minute ?? 0,
+                        second: timeComps.second ?? 0,
+                        of: dateSource) ?? timeSource
     }
     
     private func saveChanges() {

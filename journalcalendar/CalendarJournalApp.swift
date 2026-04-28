@@ -12,6 +12,7 @@ import Supabase
 struct CalendarJournalApp: App {
     @State private var authController = AuthController()
     @State private var modelData = ModelData()
+    @State var calendarService = CalendarService()
 
     var body: some Scene {
         WindowGroup {
@@ -20,11 +21,12 @@ struct CalendarJournalApp: App {
                     // Show blank background while the auth check runs off the main thread.
                     // This prevents startup lag and avoids a login-screen flash for
                     // users who are already signed in.
-                    Color("AppBackground").ignoresSafeArea()
+                    Color("BG").ignoresSafeArea()
                 } else if authController.session != nil {
                     ContentView()
                         .environment(modelData)
                         .environment(authController)
+                        .environment(calendarService)
                 } else {
                     LoginView()
                         .environment(authController)

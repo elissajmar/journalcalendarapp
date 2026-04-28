@@ -26,7 +26,7 @@ struct ImagesSubBlockEdit: View {
                 HStack {
                     Image(systemName: "photo.on.rectangle")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color("TextSecondary"))
                     
                     Text("IMAGES (\(imageData.count))")
                         .labelStyle()
@@ -40,7 +40,7 @@ struct ImagesSubBlockEdit: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                 }
             }
@@ -86,7 +86,7 @@ struct ImagesSubBlockEdit: View {
                                     } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .font(.title3)
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(Color("TextPrimaryLight"))
                                             .shadow(radius: 2)
                                     }
                                     .offset(x: -4, y: 4)
@@ -108,7 +108,7 @@ struct ImagesSubBlockEdit: View {
                                 .font(.label)
                                 .textCase(.uppercase)
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color("TextSecondary"))
                     }
                     .onChange(of: selectedItems) { _, newItems in
                         Task {

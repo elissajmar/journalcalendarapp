@@ -22,7 +22,7 @@ struct JournalSubBlockEdit: View {
                 HStack {
                     Image(systemName: "book")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color("TextSecondary"))
                     
                     Text("JOURNAL")
                         .labelStyle()
@@ -36,7 +36,7 @@ struct JournalSubBlockEdit: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color("TextSecondary"))
                     }
                 }
             }
@@ -50,14 +50,14 @@ struct JournalSubBlockEdit: View {
                         .frame(minHeight: 200)
                         .scrollContentBackground(.hidden)
                         .padding(12)
-                        .background(Color(uiColor: .secondarySystemBackground))
+                        .background(Color("SecondaryButtonFill"))
                         .cornerRadius(8)
                         .overlay(
                             Group {
                                 if text.isEmpty {
                                     Text("Say something about the moment.")
                                         .font(.paragraph1)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color("TextSecondary"))
                                         .padding(.leading, 17)
                                         .padding(.top, 20)
                                         .allowsHitTesting(false)

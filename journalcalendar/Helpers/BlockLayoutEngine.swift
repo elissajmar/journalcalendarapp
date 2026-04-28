@@ -62,11 +62,19 @@ struct BlockLayoutEngine {
     
     // MARK: - Size & Offset
     
-    /// Height in points for a block based on its duration
+    /// Height in points for a block based on its duration.
+    /// Subtracts 16 so there's an 8 px gap above (from the +8 yOffset
+    /// padding) and an 8 px gap below the block. The duration is
+    /// clamped to end-of-day so events that span midnight (or have
+    /// stale next-day endTime data) don't overflow the day grid.
     func height(for block: Block) -> CGFloat {
-        let duration = block.endTime.timeIntervalSince(block.startTime)
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: block.startTime)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? block.endTime
+        let effectiveEnd = min(block.endTime, endOfDay)
+        let duration = max(effectiveEnd.timeIntervalSince(block.startTime), 0)
         let hours = duration / 3600
-        return max(CGFloat(hours) * hourHeight - 8, 16)
+        return max(CGFloat(hours) * hourHeight - 16, 16)
     }
     
     /// Y offset in points for a block based on its start time

@@ -10,10 +10,13 @@ import SwiftUI
 struct EventBlockDetail: View {
     @Environment(ModelData.self) var modelData
     @Environment(AuthController.self) var auth
+    @Environment(CalendarService.self) var calendarService
     @Environment(\.dismiss) var dismiss
     var blockId: UUID
     
     @State private var showDeleteAlert = false
+    @State private var inviteEmail = ""
+    @State private var isInviting = false
     @State private var showRecurringDeleteDialog = false
     
     private var block: Block? {
@@ -30,6 +33,7 @@ struct EventBlockDetail: View {
                             Text(block.title)
                                 .heading3Style()
                                 .lineLimit(nil)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             
                             Text(timeRangeString(for: block))
                                 .labelStyle()
@@ -42,16 +46,48 @@ struct EventBlockDetail: View {
                         
                         // Sub-blocks
                         ForEach(block.subBlocks) { subBlock in
-                            switch subBlock {
-                            case .journal(_, let text):
-                                JournalSubBlockDetail(text: text)
-                            case .images(_, let imageData):
-                                ImagesSubBlockDetail(imageData: imageData)
-                            case .link(_, let url):
-                                LinkSubBlockDetail(url: url)
-                            case .location(_, let name, let latitude, let longitude):
-                                LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
+                            Group {
+                                switch subBlock {
+                                case .journal(_, let text):
+                                    JournalSubBlockDetail(text: text)
+                                case .images(_, let imageData):
+                                    ImagesSubBlockDetail(imageData: imageData)
+                                case .link(_, let url):
+                                    LinkSubBlockDetail(url: url)
+                                case .location(_, let name, let latitude, let longitude):
+                                    LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        
+                        if block.isPending {
+                            HStack(spacing: 20) {
+                                Button(action: {
+                                    Task { await modelData.acceptInvitation(blockId: block.id) }
+                                }) {
+                                    Text("Accept")
+                                        .fontWeight(.bold)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.green)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
+                                
+                                Button(action: {
+                                    Task { await modelData.rejectInvitation(blockId: block.id) }
+                                }) {
+                                    Text("Reject")
+                                        .fontWeight(.bold)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.red)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
+                            }
+                            .padding(.top, 24) // Add some spacing from the content above
                         }
                     }
                     .padding()
@@ -86,7 +122,7 @@ struct EventBlockDetail: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.body)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color("TextSecondary"))
                         }
                         .buttonStyle(.plain)
                     }
@@ -121,7 +157,7 @@ struct EventBlockDetail: View {
             } else {
                 Text("Block not found")
                     .paragraph1Style()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
@@ -130,14 +166,16 @@ struct EventBlockDetail: View {
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.body)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color("TextSecondary"))
                             }
                             .buttonStyle(.plain)
                         }
                     }
             }
         }
+        
     }
+    
     
     // MARK: - Helpers
     
@@ -169,14 +207,22 @@ struct EventBlockDetail: View {
     }
 }
 
+
 #Preview {
     @Previewable @State var showSheet = true
-    let modelData = ModelData.preview()
     
-    return Color.clear
+    // 1. Initialize your dependencies
+    let modelData = ModelData.preview()
+    let authController = AuthController()
+    let calendarService = CalendarService()
+    
+    // 2. Simply list the view (no 'return' keyword)
+    Color.clear
         .sheet(isPresented: $showSheet) {
             EventBlockDetail(blockId: ModelData.sampleBlock.id)
                 .environment(modelData)
+                .environment(authController)
+                .environment(calendarService)
         }
         .onAppear {
             showSheet = true

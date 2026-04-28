@@ -42,7 +42,7 @@ struct ImagesSubBlockDetail: View {
             } else {
                 Text("No images")
                     .font(.paragraph1)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("TextSecondary"))
             }
         }
         .fullScreenCover(isPresented: Binding(
