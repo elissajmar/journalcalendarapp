@@ -10,7 +10,8 @@ import SwiftUI
 
 struct SubBlockEditor: View {
     @Binding var subBlocks: [SubBlock]
-    
+    @Binding var selectedInvitee: UserSearchResult?
+
     @State private var expandedStates: [UUID: Bool] = [:]
     
     var body: some View {
@@ -40,6 +41,12 @@ struct SubBlockEditor: View {
                         locationName: locationNameBinding(for: id),
                         latitude: locationLatBinding(for: id),
                         longitude: locationLngBinding(for: id),
+                        isExpanded: expandedBinding(for: id),
+                        onRemove: { removeSubBlock(id: id) }
+                    )
+                case .invite(let id, _, _):
+                    InviteSubBlockEdit(
+                        selectedInvitee: $selectedInvitee,
                         isExpanded: expandedBinding(for: id),
                         onRemove: { removeSubBlock(id: id) }
                     )
@@ -89,6 +96,8 @@ struct SubBlockEditor: View {
                 newSubBlock = .link(url: "")
             case .location:
                 newSubBlock = .location(name: "", latitude: 0, longitude: 0)
+            case .invite:
+                newSubBlock = .invite(inviteeId: nil, inviteeEmail: "")
             }
             subBlocks.append(newSubBlock)
             expandedStates[newSubBlock.id] = true

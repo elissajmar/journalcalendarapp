@@ -192,6 +192,9 @@ extension SubBlock {
         case .location(_, let name, let lat, let lng):
             typeString = "location"
             dataJSON = SubBlockDataJSON(name: name, latitude: lat, longitude: lng)
+        case .invite:
+            typeString = "invite"
+            dataJSON = SubBlockDataJSON()
         }
 
         return SubBlockDTO(

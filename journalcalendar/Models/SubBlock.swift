@@ -13,15 +13,17 @@ enum SubBlockType: String, CaseIterable, Identifiable {
     case images = "Images"
     case link = "Link"
     case location = "Location"
-    
+    case invite = "Invite"
+
     var id: String { rawValue }
-    
+
     var iconName: String {
         switch self {
         case .journal: return "book"
         case .images: return "photo.on.rectangle"
         case .link: return "link"
         case .location: return "mappin.and.ellipse"
+        case .invite: return "person.badge.plus"
         }
     }
 }
@@ -32,22 +34,25 @@ enum SubBlock: Identifiable {
     case images(id: UUID = UUID(), imageData: [Data])
     case link(id: UUID = UUID(), url: String)
     case location(id: UUID = UUID(), name: String, latitude: Double, longitude: Double)
-    
+    case invite(id: UUID = UUID(), inviteeId: UUID?, inviteeEmail: String)
+
     var id: UUID {
         switch self {
         case .journal(let id, _): return id
         case .images(let id, _): return id
         case .link(let id, _): return id
         case .location(let id, _, _, _): return id
+        case .invite(let id, _, _): return id
         }
     }
-    
+
     var type: SubBlockType {
         switch self {
         case .journal: return .journal
         case .images: return .images
         case .link: return .link
         case .location: return .location
+        case .invite: return .invite
         }
     }
 }

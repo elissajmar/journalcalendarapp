@@ -46,6 +46,17 @@ struct EventBlockDetail: View {
                         
                         // Sub-blocks
                         ForEach(block.subBlocks) { subBlock in
+                            switch subBlock {
+                            case .journal(_, let text):
+                                JournalSubBlockDetail(text: text)
+                            case .images(_, let imageData):
+                                ImagesSubBlockDetail(imageData: imageData)
+                            case .link(_, let url):
+                                LinkSubBlockDetail(url: url)
+                            case .location(_, let name, let latitude, let longitude):
+                                LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
+                            case .invite:
+                                EmptyView()
                             Group {
                                 switch subBlock {
                                 case .journal(_, let text):
