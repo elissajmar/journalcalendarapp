@@ -89,6 +89,35 @@ struct EventBlockDetail: View {
                             }
                             .padding(.top, 24) // Add some spacing from the content above
                         }
+                        
+                        if block.isPending {
+                            HStack(spacing: 20) {
+                                Button(action: {
+                                    Task { await modelData.acceptInvitation(blockId: block.id) }
+                                }) {
+                                    Text("Accept")
+                                        .fontWeight(.bold)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.green)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
+                                
+                                Button(action: {
+                                    Task { await modelData.rejectInvitation(blockId: block.id) }
+                                }) {
+                                    Text("Reject")
+                                        .fontWeight(.bold)
+                                        .padding()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.red)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
+                            }
+                            .padding(.top, 24) // Add some spacing from the content above
+                        }
                     }
                     .padding()
                 }
