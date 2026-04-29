@@ -54,6 +54,8 @@ struct EventBlockDetail: View {
                                 LinkSubBlockDetail(url: url)
                             case .location(_, let name, let latitude, let longitude):
                                 LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
+                            case .invite:
+                                EmptyView()
                             }
                         }
                         

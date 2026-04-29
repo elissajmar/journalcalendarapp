@@ -23,7 +23,7 @@ struct AddEventBlock: View {
     @State private var recurrence: Recurrence = .never
     @State private var subBlocks: [SubBlock] = []
     
-    @State private var inviteeEmail: String = ""
+    @State private var selectedInvitee: UserSearchResult?
     @State private var isCreating: Bool = false
     
     init(initialDate: Date) {
@@ -78,31 +78,7 @@ struct AddEventBlock: View {
                         .textCase(.uppercase)
                         .tint(.primary)
                     }
-//                    VStack(alignment: .leading, spacing: 12) {
-//                        Text("Invite a Friend")
-//                            .font(.label)
-//                            .foregroundStyle(.secondary)
-//                        
-//                        TextField("Email Address", text: $inviteeEmail)
-//                            .textFieldStyle(.roundedBorder)
-//                            .autocorrectionDisabled()
-//                            .textInputAutocapitalization(.never)
-//                            .keyboardType(.emailAddress)
-//                    }
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Invite a Friend")
-                            .font(.label)
-                            .foregroundStyle(.secondary)
-                        
-                        TextField("Email Address", text: $inviteeEmail)
-                            .textFieldStyle(.roundedBorder)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                    }
-                    
-                    SubBlockEditor(subBlocks: $subBlocks)
+                    SubBlockEditor(subBlocks: $subBlocks, selectedInvitee: $selectedInvitee)
                 }
                 .padding()
             }
@@ -161,21 +137,22 @@ struct AddEventBlock: View {
         isCreating = true
         
         Task {
-            // 1. Create the event and get the ID back
+            // Filter out invite sub-blocks (handled separately via event_invitees)
+            let persistableSubBlocks = subBlocks.filter { $0.type != .invite }
+
             let newBlockId = await modelData.createBlock(
                 title: title,
                 startTime: startTime,
                 endTime: endTime,
                 recurrence: recurrence,
-                subBlocks: subBlocks,
+                subBlocks: persistableSubBlocks,
                 userId: userId
             )
-            
-            // 2. If the block was created and an email was provided, send the invite
-            if let eventId = newBlockId, !inviteeEmail.isEmpty {
-                await modelData.inviteUser(email: inviteeEmail, to: eventId)
+
+            if let eventId = newBlockId, let invitee = selectedInvitee {
+                await modelData.inviteUser(inviteeId: invitee.id, email: invitee.email, to: eventId)
             }
-            
+
             isCreating = false
             dismiss()
         }

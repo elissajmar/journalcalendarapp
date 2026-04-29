@@ -177,6 +177,14 @@ struct DayCalendarView: View {
                     .foregroundStyle(Color("TextPrimaryLight"))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+
+                Button {
+                    Task { try? await auth.signOut() }
+                } label: {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.body)
+                        .foregroundStyle(Color("TextSecondary"))
+                }
             }
             .padding(.horizontal)
             .padding(.vertical, 12)

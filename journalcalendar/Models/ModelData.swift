@@ -24,7 +24,7 @@ class ModelData {
             let dateString = BlockDTO.dateFormatter.string(from: date)
             let userIdString = userId.uuidString.lowercased()
 
-            // Fetch blocks for the exact date
+            // Fetch owned blocks for the exact date
             let exactDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
                 .select("*, sub_blocks(*)")
@@ -34,7 +34,7 @@ class ModelData {
                 .execute()
                 .value
 
-            // Fetch recurring blocks from earlier dates
+            // Fetch owned recurring blocks from earlier dates
             let recurringDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
                 .select("*, sub_blocks(*)")
@@ -45,6 +45,20 @@ class ModelData {
                 .execute()
                 .value
 
+            // Fetch invited blocks for this date
+            let inviteStatuses = await fetchInviteStatuses(userId: userId)
+            var invitedDtos: [BlockWithSubBlocksDTO] = []
+            if !inviteStatuses.isEmpty {
+                invitedDtos = try await AppSupabase.client
+                    .from("blocks")
+                    .select("*, sub_blocks(*)")
+                    .eq("date", value: dateString)
+                    .in("id", value: Array(inviteStatuses.keys).map { $0.uuidString.lowercased() })
+                    .order("start_time")
+                    .execute()
+                    .value
+            }
+
             // Filter recurring blocks that match the selected date
             let matchingRecurring = recurringDtos.filter { dto in
                 guard let originDate = BlockDTO.dateFormatter.date(from: dto.date) else { return false }
@@ -53,26 +67,18 @@ class ModelData {
                 return Self.recurrenceMatches(recurrence, originDate: originDate, targetDate: date, exceptions: dto.exceptions ?? [], recurrenceEnd: recurrenceEnd)
             }
 
-            // Combine, deduplicating by id
-            let allDtos = exactDtos + matchingRecurring
+            // Combine owned + recurring + invited, deduplicating by id
+            let allDtos = exactDtos + matchingRecurring + invitedDtos
             var seenIds = Set<UUID>()
             let targetDateString = BlockDTO.dateFormatter.string(from: date)
             var uniqueDtos: [BlockWithSubBlocksDTO] = []
 
             for dto in allDtos {
                 guard seenIds.insert(dto.id).inserted else { continue }
-                // Skip if this date is in the block's exceptions list
                 if (dto.exceptions ?? []).contains(targetDateString) {
                     continue
                 }
                 uniqueDtos.append(dto)
-            }
-
-            print("DEBUG: userId=\(userIdString), date=\(dateString)")
-            print("DEBUG: exactDtos count=\(exactDtos.count)")
-            print("DEBUG: recurringDtos count=\(recurringDtos.count)")
-            for dto in exactDtos {
-                print("DEBUG: exact dto id=\(dto.id) title=\(dto.title) date=\(dto.date) start=\(dto.startTime)")
             }
 
             var fetchedBlocks = await processBlockDTOs(uniqueDtos)
@@ -84,6 +90,10 @@ class ModelData {
                 }
                 return block
             }
+
+            // Mark invited blocks as pending
+            let pendingIds = Set(inviteStatuses.filter { $0.value == "pending" }.map { $0.key })
+            markPendingBlocks(&fetchedBlocks, pendingIds: pendingIds)
 
             print("DEBUG: fetchedBlocks count=\(fetchedBlocks.count)")
             blocks = fetchedBlocks
@@ -104,7 +114,7 @@ class ModelData {
 
             print("DEBUG multi-date: fetching \(dateStrings.count) dates, userId=\(userIdString)")
 
-            // Fetch blocks with exact date matches
+            // Fetch owned blocks with exact date matches
             let exactDtos: [BlockWithSubBlocksDTO] = try await AppSupabase.client
                 .from("blocks")
                 .select("*, sub_blocks(*)")
@@ -114,9 +124,24 @@ class ModelData {
                 .execute()
                 .value
 
-            print("DEBUG multi-date: exactDtos=\(exactDtos.count)")
+            // Fetch invited blocks for these dates
+            let inviteStatuses = await fetchInviteStatuses(userId: userId)
+            var invitedDtos: [BlockWithSubBlocksDTO] = []
+            if !inviteStatuses.isEmpty {
+                invitedDtos = try await AppSupabase.client
+                    .from("blocks")
+                    .select("*, sub_blocks(*)")
+                    .in("date", value: dateStrings)
+                    .in("id", value: Array(inviteStatuses.keys).map { $0.uuidString.lowercased() })
+                    .order("start_time")
+                    .execute()
+                    .value
+            }
+            let allExactDtos = exactDtos + invitedDtos
 
-            // Fetch recurring blocks from before the date range
+            print("DEBUG multi-date: exactDtos=\(exactDtos.count), invitedDtos=\(invitedDtos.count)")
+
+            // Fetch recurring blocks from before the date range (owned only)
             guard let earliestDate = dates.min() else { blocks = []; return }
             let earliestDateString = BlockDTO.dateFormatter.string(from: earliestDate)
 
@@ -136,7 +161,7 @@ class ModelData {
             }
 
             // Combine all recurring DTOs: from before the range AND within the range
-            let allRecurring = recurringDtos + exactDtos.filter {
+            let allRecurring = recurringDtos + allExactDtos.filter {
                 let rec = Recurrence(rawValue: $0.recurrence ?? "never") ?? .never
                 return rec != .never
             }
@@ -145,7 +170,7 @@ class ModelData {
             var expandedDtos: [(dto: BlockWithSubBlocksDTO, targetDate: Date)] = []
 
             // Add non-recurring exact matches with their own date
-            for dto in exactDtos {
+            for dto in allExactDtos {
                 let rec = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
                 if rec == .never, let date = BlockDTO.dateFormatter.date(from: dto.date) {
                     expandedDtos.append((dto, date))
@@ -194,6 +219,10 @@ class ModelData {
                 fetchedBlocks.append(block)
             }
 
+            // Mark invited blocks as pending
+            let pendingIds = Set(inviteStatuses.filter { $0.value == "pending" }.map { $0.key })
+            markPendingBlocks(&fetchedBlocks, pendingIds: pendingIds)
+
             blocks = fetchedBlocks
         } catch {
             print("Error fetching blocks for multiple dates: \(error)")
@@ -217,6 +246,21 @@ class ModelData {
                 .execute()
                 .value
 
+            // Fetch invited blocks for these dates
+            let inviteStatuses = await fetchInviteStatuses(userId: userId)
+            var invitedDtos: [BlockWithSubBlocksDTO] = []
+            if !inviteStatuses.isEmpty {
+                invitedDtos = try await AppSupabase.client
+                    .from("blocks")
+                    .select("*, sub_blocks(*)")
+                    .in("date", value: dateStrings)
+                    .in("id", value: Array(inviteStatuses.keys).map { $0.uuidString.lowercased() })
+                    .order("start_time")
+                    .execute()
+                    .value
+            }
+            let allExactDtos = exactDtos + invitedDtos
+
             guard let earliestDate = dates.min() else { return [] }
             let earliestDateString = BlockDTO.dateFormatter.string(from: earliestDate)
 
@@ -230,14 +274,14 @@ class ModelData {
                 .execute()
                 .value
 
-            let allRecurring = recurringDtos + exactDtos.filter {
+            let allRecurring = recurringDtos + allExactDtos.filter {
                 let rec = Recurrence(rawValue: $0.recurrence ?? "never") ?? .never
                 return rec != .never
             }
 
             var expandedDtos: [(dto: BlockWithSubBlocksDTO, targetDate: Date)] = []
 
-            for dto in exactDtos {
+            for dto in allExactDtos {
                 let rec = Recurrence(rawValue: dto.recurrence ?? "never") ?? .never
                 if rec == .never, let date = BlockDTO.dateFormatter.date(from: dto.date) {
                     expandedDtos.append((dto, date))
@@ -281,6 +325,10 @@ class ModelData {
                 }
                 fetchedBlocks.append(block)
             }
+
+            // Mark invited blocks as pending
+            let pendingIds = Set(inviteStatuses.filter { $0.value == "pending" }.map { $0.key })
+            markPendingBlocks(&fetchedBlocks, pendingIds: pendingIds)
 
             return fetchedBlocks
         } catch {
@@ -335,6 +383,35 @@ class ModelData {
             }
         }
         return fetchedBlocks
+    }
+
+    // MARK: - Invitation Helpers
+
+    /// Fetches all non-rejected invitation statuses for the current user.
+    /// Returns a map of block ID → status ("pending" or "accepted").
+    private func fetchInviteStatuses(userId: UUID) async -> [UUID: String] {
+        do {
+            let rows: [InvitationStatusDTO] = try await AppSupabase.client
+                .from("event_invitees")
+                .select("event_id, status")
+                .eq("invitee_id", value: userId.uuidString.lowercased())
+                .neq("status", value: "rejected")
+                .execute()
+                .value
+            return Dictionary(uniqueKeysWithValues: rows.map { ($0.eventId, $0.status) })
+        } catch {
+            print("Error fetching invitation statuses: \(error)")
+            return [:]
+        }
+    }
+
+    /// Marks blocks that the user was invited to as pending.
+    private func markPendingBlocks(_ blocks: inout [Block], pendingIds: Set<UUID>) {
+        for i in blocks.indices {
+            if pendingIds.contains(blocks[i].id) {
+                blocks[i].isPending = true
+            }
+        }
     }
 
     // MARK: - Recurrence Matching
@@ -452,10 +529,27 @@ class ModelData {
 
     // MARK: - Invitation Actions
 
-    /// Inserts a new invitation record into the event_invitees table
-    func inviteUser(email: String, to blockId: UUID) async {
+    /// Searches for app users by partial email match.
+    func searchUsers(query: String) async -> [UserSearchResult] {
+        let trimmed = query.lowercased().trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else { return [] }
+        do {
+            let results: [UserSearchResult] = try await AppSupabase.client
+                .rpc("search_users_by_email", params: ["search_text": trimmed])
+                .execute()
+                .value
+            return results
+        } catch {
+            print("DEBUG: User search error: \(error)")
+            return []
+        }
+    }
+
+    /// Inserts a new invitation record into the event_invitees table.
+    func inviteUser(inviteeId: UUID, email: String, to blockId: UUID) async {
         let invite = EventInviteeDTO(
             event_id: blockId,
+            invitee_id: inviteeId,
             invitee_email: email.lowercased().trimmingCharacters(in: .whitespaces),
             status: "pending"
         )
@@ -465,20 +559,19 @@ class ModelData {
                 .from("event_invitees")
                 .insert(invite)
                 .execute()
-
             print("DEBUG: Insert status code: \(response.status)")
         } catch {
             print("DEBUG: Detailed error: \(error)")
         }
     }
 
-    /// Accepts an invitation by updating the block status to 'accepted'
+    /// Accepts an invitation by updating the event_invitees status to 'accepted'
     func acceptInvitation(blockId: UUID) async {
         do {
             try await AppSupabase.client
-                .from("blocks")
+                .from("event_invitees")
                 .update(["status": "accepted"])
-                .eq("id", value: blockId.uuidString)
+                .eq("event_id", value: blockId.uuidString)
                 .execute()
 
             if let index = blocks.firstIndex(where: { $0.id == blockId }) {
@@ -489,13 +582,13 @@ class ModelData {
         }
     }
 
-    /// Rejects an invitation by updating the block status to 'rejected'
+    /// Rejects an invitation by updating the event_invitees status to 'rejected'
     func rejectInvitation(blockId: UUID) async {
         do {
             try await AppSupabase.client
-                .from("blocks")
+                .from("event_invitees")
                 .update(["status": "rejected"])
-                .eq("id", value: blockId.uuidString)
+                .eq("event_id", value: blockId.uuidString)
                 .execute()
 
             blocks.removeAll { $0.id == blockId }
@@ -747,6 +840,22 @@ class ModelData {
 
 struct EventInviteeDTO: Encodable {
     let event_id: UUID
+    let invitee_id: UUID
     let invitee_email: String
     let status: String
+}
+
+struct UserSearchResult: Codable, Identifiable {
+    let id: UUID
+    let email: String
+}
+
+private struct InvitationStatusDTO: Codable {
+    let eventId: UUID
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case eventId = "event_id"
+        case status
+    }
 }
