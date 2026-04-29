@@ -21,7 +21,6 @@ struct EventBlockDetailEdit: View {
     @State private var subBlocks: [SubBlock] = []
     @State private var showDeleteAlert: Bool = false
     @State private var showRecurringDeleteDialog: Bool = false
-    @State private var selectedInvitee: UserSearchResult?
     
     private var block: Block? {
         modelData.blocks.first(where: { $0.id == blockId })
@@ -65,7 +64,7 @@ struct EventBlockDetailEdit: View {
                     .tint(.primary)
                 }
                 
-                SubBlockEditor(subBlocks: $subBlocks, selectedInvitee: $selectedInvitee)
+                SubBlockEditor(subBlocks: $subBlocks)
             }
             .padding()
         }
@@ -167,7 +166,6 @@ struct EventBlockDetailEdit: View {
     
     private func saveChanges() {
         guard let userId = auth.currentUserId else { return }
-        let persistableSubBlocks = subBlocks.filter { $0.type != .invite }
         Task {
             await modelData.updateBlock(
                 id: blockId,
@@ -175,12 +173,9 @@ struct EventBlockDetailEdit: View {
                 startTime: startTime,
                 endTime: endTime,
                 recurrence: recurrence,
-                subBlocks: persistableSubBlocks,
+                subBlocks: subBlocks,
                 userId: userId
             )
-            if let invitee = selectedInvitee {
-                await modelData.inviteUser(inviteeId: invitee.id, email: invitee.email, to: blockId)
-            }
         }
         dismiss()
     }

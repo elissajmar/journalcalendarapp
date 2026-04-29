@@ -46,17 +46,6 @@ struct EventBlockDetail: View {
                         
                         // Sub-blocks
                         ForEach(block.subBlocks) { subBlock in
-                            switch subBlock {
-                            case .journal(_, let text):
-                                JournalSubBlockDetail(text: text)
-                            case .images(_, let imageData):
-                                ImagesSubBlockDetail(imageData: imageData)
-                            case .link(_, let url):
-                                LinkSubBlockDetail(url: url)
-                            case .location(_, let name, let latitude, let longitude):
-                                LocationSubBlockDetail(name: name, latitude: latitude, longitude: longitude)
-                            case .invite:
-                                EmptyView()
                             Group {
                                 switch subBlock {
                                 case .journal(_, let text):
@@ -70,35 +59,6 @@ struct EventBlockDetail: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        
-                        if block.isPending {
-                            HStack(spacing: 20) {
-                                Button(action: {
-                                    Task { await modelData.acceptInvitation(blockId: block.id) }
-                                }) {
-                                    Text("Accept")
-                                        .fontWeight(.bold)
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(Color.green)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(10)
-                                }
-                                
-                                Button(action: {
-                                    Task { await modelData.rejectInvitation(blockId: block.id) }
-                                }) {
-                                    Text("Reject")
-                                        .fontWeight(.bold)
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(Color.red)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(10)
-                                }
-                            }
-                            .padding(.top, 24) // Add some spacing from the content above
                         }
                         
                         if block.isPending {
