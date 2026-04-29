@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Auth
 
 struct LoginView: View {
     @Environment(AuthController.self) var auth
@@ -38,17 +39,26 @@ struct LoginView: View {
             
             // Email, password, and create account button (8px gaps)
             VStack(spacing: 8) {
-                TextField("Youraddress@gmail.com", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.paragraph1)
-                    .multilineTextAlignment(.center)
-                    .padding(.vertical, 18)
-                    .padding(.horizontal, 20)
-                    .background(Color("CardFill"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                ZStack {
+                    if email.isEmpty {
+                        Text("Youraddress@gmail.com")
+                            .font(.paragraph1)
+                            .foregroundStyle(Color(UIColor.placeholderText))
+                            .allowsHitTesting(false)
+                    }
+                    TextField("", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.paragraph1)
+                        .foregroundStyle(Color("TextPrimary"))
+                        .tint(Color("TextSecondary"))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 18)
+                .padding(.horizontal, 20)
+                .background(Color("CardFill"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 
                 SecureField("Password", text: $password)
                     .textContentType(mode == .signUp ? .newPassword : .password)
@@ -116,10 +126,11 @@ struct LoginView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 24)
             
-            // Social sign-in buttons (placeholders)
+            // Social sign-in buttons
             VStack(spacing: 8) {
-                socialButton(icon: "g.square.fill", label: "Sign in with Google")
-                socialButton(icon: "apple.logo", label: "Sign in with Apple")
+                socialButton(icon: "g.square.fill", label: "\(socialActionPrefix) with Google") {
+                    await oauthAction(.google)
+                }
             }
             .padding(.horizontal, 24)
             
@@ -144,10 +155,18 @@ struct LoginView: View {
     }
     
     // MARK: - Components
-    
-    private func socialButton(icon: String, label: String) -> some View {
+
+    private var socialActionPrefix: String {
+        mode == .signUp ? "Sign up" : "Sign in"
+    }
+
+    private func socialButton(
+        icon: String,
+        label: String,
+        action: @escaping () async -> Void
+    ) -> some View {
         Button {
-            // Placeholder for future implementation
+            Task { await action() }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
@@ -162,6 +181,8 @@ struct LoginView: View {
             .background(Color("CardFill"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
+        .disabled(isLoading)
+        .opacity(isLoading ? 0.5 : 1.0)
     }
     
     // MARK: - Actions
@@ -188,6 +209,27 @@ struct LoginView: View {
         }
     }
     
+    @MainActor
+    private func oauthAction(_ provider: Provider) async {
+        isLoading = true
+        errorMessage = nil
+        showEmailConfirmation = false
+        defer { isLoading = false }
+
+        do {
+            try await auth.signInWithOAuth(provider: provider)
+        } catch is CancellationError {
+            // User dismissed the web auth sheet
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == "com.apple.AuthenticationServices.WebAuthenticationSession",
+               nsError.code == 1 {
+                return
+            }
+            errorMessage = mapAuthError(error)
+        }
+    }
+
     private func mapAuthError(_ error: Error) -> String {
         let message = error.localizedDescription.lowercased()
         if message.contains("invalid login credentials") || message.contains("invalid_credentials") {

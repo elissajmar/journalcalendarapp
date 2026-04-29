@@ -77,8 +77,25 @@ final class AuthController {
     }
     
     // MARK: - Sign Out
-    
+
     func signOut() async throws {
         try await AppSupabase.client.auth.signOut()
+    }
+
+    // MARK: - OAuth (Google / Apple)
+
+    func signInWithOAuth(provider: Provider) async throws {
+        try await AppSupabase.client.auth.signInWithOAuth(
+            provider: provider,
+            redirectTo: URL(string: "journalcalendar://login-callback")
+        )
+    }
+
+    func signInWithGoogle() async throws {
+        try await signInWithOAuth(provider: .google)
+    }
+
+    func signInWithApple() async throws {
+        try await signInWithOAuth(provider: .apple)
     }
 }
