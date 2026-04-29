@@ -19,9 +19,7 @@ struct BlockDTO: Codable {
     let date: String        // yyyy-MM-dd
     let startTime: String   // ISO8601 timestamptz
     let endTime: String     // ISO8601 timestamptz
-    let status: String?    
-    enum CodingKeys: String, CodingKey {
-        case id, title, date, status
+    let status: String?
     let recurrence: String  // "never", "daily", "weekly", "monthly", "yearly"
     let exceptions: [String]?      // dates (yyyy-MM-dd) to skip
     let recurrenceEnd: String?     // last date (yyyy-MM-dd) for recurrence
@@ -80,9 +78,6 @@ struct BlockWithSubBlocksDTO: Codable {
     let startTime: String
     let endTime: String
     let status: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, date, status
     let recurrence: String?
     let exceptions: [String]?
     let recurrenceEnd: String?
